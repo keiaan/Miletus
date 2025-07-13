@@ -1,0 +1,34 @@
+{
+  "d258f054": {
+    "checkin_time": "2025-06-10T22:22:10.974Z",
+    "status": "active"
+  },
+  "fa821075": {
+    "checkin_time": "2025-06-10T22:30:05.351Z",
+    "status": "completed",
+    "checkout_time": "2025-06-11T21:49:47.144Z",
+    "final_location": {
+      "lat": 52.31064093128734,
+      "lng": -1.9590174829266787,
+      "accuracy": 35
+    }
+  },
+  "fd788cdb": {
+    "checkin_time": "2025-06-11T20:28:22.427Z",
+    "status": "completed",
+    "checkout_time": "2025-06-11T21:45:47.054Z",
+    "final_location": {
+      "lat": 52.310805242623246,
+      "lng": -1.9591036835372238,
+      "accuracy": 35
+    }
+  },
+  "da84d17a": {
+    "checkin_time": "2025-06-11T21:29:11.968Z",
+    "status": "active"
+  },
+  "a2a11802": {
+    "checkin_time": "2025-06-25T18:22:39.262Z",
+    "status": "active"
+  }
+}

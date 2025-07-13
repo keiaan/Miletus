@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Dashboard - AutoScheduler</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2a2a2a;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --accent-purple: #8b5cf6;
+            --accent-purple-dark: #7c3aed;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: rgba(42, 42, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .company-selector {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .status-completed { color: var(--accent-green); }
+        .status-failed { color: var(--accent-red); }
+        .status-pending { color: var(--accent-orange); }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-purple));
+            height: 8px;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .route-card {
+            transition: all 0.3s ease;
+        }
+
+        .route-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body>
+    {% set current_page = 'delivery_dashboard' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-white">
+                        <i class="fas fa-tachometer-alt mr-3 text-purple-400"></i>
+                        Delivery Dashboard
+                    </h1>
+                    <p class="text-gray-400 mt-2">Real-time delivery tracking and status monitoring</p>
+                </div>
+
+        <!-- Company Selector (for global admins) -->
+        {% if is_global_admin and not company_name %}
+        <div class="company-selector rounded-xl p-6 mb-8">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fas fa-building text-4xl text-purple-400 mb-3"></i>
+                    <h2 class="text-xl font-semibold text-white">Select Company</h2>
+                    <p class="text-gray-400 mt-2">Choose a company to view delivery dashboard</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                    {% for company in companies %}
+                    <a href="{{ url_for('delivery_dashboard', company=company) }}"
+                       class="card p-6 rounded-xl hover:bg-purple-900/20 transition-all duration-300 text-center">
+                        <i class="fas fa-building text-2xl text-purple-400 mb-3"></i>
+                        <h3 class="text-lg font-medium text-white">{{ company }}</h3>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-900/50">
+                        <i class="fas fa-route text-purple-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-400 text-sm">Active Routes</p>
+                        <p class="text-2xl font-bold text-white">{{ delivery_data|length }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-900/50">
+                        <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-400 text-sm">Completed</p>
+                        <p class="text-2xl font-bold text-white">
+                            {{ delivery_data|sum(attribute='stats.completed') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-red-900/50">
+                        <i class="fas fa-times-circle text-red-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-400 text-sm">Failed</p>
+                        <p class="text-2xl font-bold text-white">
+                            {{ delivery_data|sum(attribute='stats.failed') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card rounded-xl p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-orange-900/50">
+                        <i class="fas fa-clock text-orange-400 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-400 text-sm">Pending</p>
+                        <p class="text-2xl font-bold text-white">
+                            {{ delivery_data|sum(attribute='stats.pending') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Routes -->
+        <div class="card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Active Routes (Last 24 Hours)</h2>
+                <button onclick="refreshDashboard()" 
+                        class="btn-primary px-4 py-2 rounded-md text-white">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Refresh
+                </button>
+            </div>
+
+            {% if delivery_data %}
+            <div class="space-y-4">
+                {% for route in delivery_data %}
+                <div class="route-card bg-[#1A1A1A] rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white">{{ route.driver_name or 'Unknown Driver' }}</h3>
+                            <p class="text-gray-400 text-sm">Route ID: {{ route.route_id }}</p>
+                            <p class="text-gray-400 text-sm">Created: {{ route.created_at[:19].replace('T', ' ') if route.created_at else 'Unknown' }}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <a href="/admin/route/{{ route.route_id }}" target="_blank"
+                               class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-white text-sm transition-colors duration-300">
+                                <i class="fas fa-map-marked-alt mr-1"></i>
+                                Admin View
+                            </a>
+                            <a href="{{ route.tracking_url }}" target="_blank"
+                               class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm transition-colors duration-300">
+                                <i class="fas fa-external-link-alt mr-1"></i>
+                                Driver View
+                            </a>
+                            <button onclick="removeRoute('{{ route.route_id }}')"
+                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition-colors duration-300">
+                                <i class="fas fa-trash mr-1"></i>
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm text-gray-400 mb-2">
+                            <span>Progress</span>
+                            <span>{{ route.stats.completed }} of {{ route.total_stops }} completed ({{ "%.1f"|format(route.stats.completion_rate) }}%)</span>
+                        </div>
+                        <div class="bg-gray-700 rounded-full h-2">
+                            <div class="progress-bar" style="width: {{ route.stats.completion_rate }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Status Summary -->
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold status-completed">{{ route.stats.completed }}</div>
+                            <div class="text-sm text-gray-400">Completed</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold status-failed">{{ route.stats.failed }}</div>
+                            <div class="text-sm text-gray-400">Failed</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold status-pending">{{ route.stats.pending }}</div>
+                            <div class="text-sm text-gray-400">Pending</div>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Details -->
+                    {% if route.deliveries %}
+                    <div class="border-t border-gray-600 pt-4">
+                        <h4 class="text-sm font-medium text-gray-300 mb-3">Recent Updates:</h4>
+                        <div class="space-y-2 max-h-32 overflow-y-auto">
+                            {% for address, delivery in route.deliveries.items() %}
+                            <div class="flex items-center justify-between text-sm">
+                                <div class="flex-1">
+                                    <span class="text-white">{{ address[:50] }}{% if address|length > 50 %}...{% endif %}</span>
+                                    {% if delivery.notes %}
+                                    <div class="text-gray-400 text-xs mt-1">{{ delivery.notes }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="status-{{ delivery.status }} font-medium">
+                                        {% if delivery.status == 'completed' %}
+                                        <i class="fas fa-check-circle mr-1"></i>Completed
+                                        {% elif delivery.status == 'failed' %}
+                                        <i class="fas fa-times-circle mr-1"></i>Failed
+                                        {% else %}
+                                        <i class="fas fa-clock mr-1"></i>Pending
+                                        {% endif %}
+                                    </span>
+                                    <span class="text-gray-500 text-xs">
+                                        {{ delivery.timestamp[:16].replace('T', ' ') if delivery.timestamp else '' }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-route text-6xl text-gray-600 mb-4"></i>
+                <h3 class="text-xl font-medium text-gray-400 mb-2">No Active Routes</h3>
+                <p class="text-gray-500">No routes have been created in the last 24 hours.</p>
+                <a href="{{ url_for('index') }}" 
+                   class="btn-primary px-6 py-3 rounded-md text-white mt-4 inline-block">
+                    <i class="fas fa-plus mr-2"></i>
+                    Create New Route
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function refreshDashboard() {
+            location.reload();
+        }
+
+        function removeRoute(routeId) {
+            if (!confirm('Are you sure you want to remove this route from the dashboard? This will also delete all associated tracking data.')) {
+                return;
+            }
+
+            fetch(`/remove_from_dashboard/${routeId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSuccess('Route removed successfully!');
+                    // Refresh the dashboard after a short delay
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    alert('Failed to remove route: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error removing route:', error);
+                alert('Failed to remove route. Please try again.');
+            });
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-3 rounded-md shadow-lg z-50 max-w-sm';
+            successDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    <div>
+                        <div class="font-medium">${message}</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(successDiv);
+
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.remove();
+                }
+            }, 3000);
+        }
+
+
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshDashboard, 30000);
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>

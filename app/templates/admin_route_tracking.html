@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Route Tracking - AutoScheduler</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2a2a2a;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --accent-purple: #8b5cf6;
+            --accent-purple-dark: #7c3aed;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: rgba(42, 42, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .delivery-item {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .delivery-item.pending {
+            border-left-color: var(--accent-orange);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .delivery-item.completed {
+            border-left-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .delivery-item.failed {
+            border-left-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .status-completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .status-failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-purple));
+            height: 8px;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 12px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            background: #1a1a1a;
+        }
+
+        .location-status {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body>
+    {% set current_page = 'delivery_dashboard' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-3xl font-bold text-white">
+                                <i class="fas fa-map-marked-alt mr-3 text-purple-400"></i>
+                                Admin Route Tracking
+                            </h1>
+                            <p class="text-gray-400 mt-2">Real-time monitoring and GPS tracking</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <a href="/route/{{ route_id }}" target="_blank"
+                               class="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300">
+                                <i class="fas fa-external-link-alt mr-2"></i>
+                                Driver View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+        <!-- Route Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Route Details -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-xl font-semibold text-purple-400 mb-4">
+                    <i class="fas fa-route mr-2"></i>
+                    Route Details
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-gray-400 text-sm">Driver</label>
+                        <div class="text-lg font-medium text-white">{{ route_data.driver_name }}</div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-gray-400 text-sm">Route ID</label>
+                        <div class="text-lg font-mono text-purple-400">{{ route_id }}</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-gray-400 text-sm">Distance</label>
+                            <div class="text-lg font-medium text-white">{{ route_data.total_distance }}</div>
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-sm">Time</label>
+                            <div class="text-lg font-medium text-white">{{ route_data.total_time }}</div>
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-sm">Stops</label>
+                            <div class="text-lg font-medium text-white">{{ route_data.num_stops }}</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-gray-400 text-sm">Created</label>
+                        <div class="text-lg font-medium text-white">
+                            {{ route_data.created_at[:19].replace('T', ' ') if route_data.created_at else 'Unknown' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Route Timing -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-xl font-semibold text-blue-400 mb-4">
+                    <i class="fas fa-clock mr-2"></i>
+                    Route Timing
+                </h2>
+
+                <div id="timing-info" class="space-y-4">
+                    <div id="not-checked-in" class="bg-gray-800 rounded-lg p-4 text-center">
+                        <i class="fas fa-clock text-4xl text-gray-600 mb-3"></i>
+                        <h3 class="text-lg font-medium text-gray-400 mb-2">Not Started</h3>
+                        <p class="text-gray-500">Driver has not checked in yet</p>
+                    </div>
+
+                    <div id="timing-active" class="space-y-3" style="display: none;">
+                        <div class="bg-blue-600 rounded-lg p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-blue-100 font-medium">
+                                    <i class="fas fa-play mr-2"></i>
+                                    Route Active
+                                </span>
+                                <span class="text-sm text-blue-200" id="admin-start-time">
+                                    Started: --:--
+                                </span>
+                            </div>
+
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-white" id="admin-elapsed-time">00:00:00</div>
+                                <div class="text-sm text-blue-200">Elapsed Time</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-800 rounded p-3 text-center">
+                                <div class="text-lg font-semibold text-green-400" id="admin-completed-count">0</div>
+                                <div class="text-gray-400">Completed</div>
+                            </div>
+                            <div class="bg-gray-800 rounded p-3 text-center">
+                                <div class="text-lg font-semibold text-orange-400" id="admin-pending-count">{{ route_data.num_stops }}</div>
+                                <div class="text-gray-400">Remaining</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Driver Location Status -->
+            <div class="card rounded-xl p-6">
+                <h2 class="text-xl font-semibold text-green-400 mb-4">
+                    <i class="fas fa-map-marker-alt mr-2"></i>
+                    Driver Location
+                </h2>
+                
+                <div id="location-info" class="space-y-4">
+                    {% if driver_location %}
+                    <div class="location-status rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-green-400 font-medium">
+                                <i class="fas fa-satellite-dish mr-2"></i>
+                                GPS Active
+                            </span>
+                            <span class="text-sm text-gray-400" id="last-update">
+                                Last update: {{ driver_location.last_updated[:19].replace('T', ' ') if driver_location.last_updated else 'Unknown' }}
+                            </span>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-gray-400 text-sm">Current Location</label>
+                                <div id="nearby-address" class="text-white">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                                    Finding nearby address...
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-gray-400 text-sm">Next Stop</label>
+                                <div id="next-stop-info" class="text-white">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                                    Calculating distance...
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-gray-400 text-sm">GPS Accuracy</label>
+                                <div class="text-white">{{ "%.0f"|format(driver_location.accuracy) }} meters</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="bg-gray-800 rounded-lg p-4 text-center">
+                        <i class="fas fa-map-marker-alt text-4xl text-gray-600 mb-3"></i>
+                        <h3 class="text-lg font-medium text-gray-400 mb-2">No GPS Data</h3>
+                        <p class="text-gray-500">Driver location not available or GPS not enabled</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Google Maps -->
+        <div class="card rounded-xl p-6 mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-purple-400">
+                    <i class="fas fa-map mr-2"></i>
+                    Live Route Map
+                </h2>
+                <button onclick="refreshLocation()" 
+                        class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white transition-colors duration-300">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Refresh Location
+                </button>
+            </div>
+            
+            <div id="map"></div>
+        </div>
+
+        <!-- Delivery Progress -->
+        <div class="card rounded-xl p-6">
+            <h2 class="text-xl font-semibold text-purple-400 mb-4">
+                <i class="fas fa-list-check mr-2"></i>
+                Delivery Progress
+            </h2>
+
+            <!-- Progress Summary -->
+            {% if delivery_status and delivery_status.deliveries %}
+            {% set completed = delivery_status.deliveries.values() | selectattr('status', 'equalto', 'completed') | list | length %}
+            {% set failed = delivery_status.deliveries.values() | selectattr('status', 'equalto', 'failed') | list | length %}
+            {% set total_deliveries = delivery_status.deliveries | length %}
+            {% set pending = total_deliveries - completed - failed %}
+            
+            <div class="mb-6">
+                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>Overall Progress</span>
+                    <span>{{ completed }} of {{ route_data.num_stops }} completed</span>
+                </div>
+                <div class="bg-gray-700 rounded-full h-3">
+                    <div class="progress-bar" style="width: {{ (completed / route_data.num_stops * 100) if route_data.num_stops > 0 else 0 }}%"></div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 mt-4 text-center">
+                    <div>
+                        <div class="text-2xl font-bold text-green-400">{{ completed }}</div>
+                        <div class="text-sm text-gray-400">Completed</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-red-400">{{ failed }}</div>
+                        <div class="text-sm text-gray-400">Failed</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-orange-400">{{ pending }}</div>
+                        <div class="text-sm text-gray-400">Pending</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Delivery List -->
+            <div id="delivery-list" class="space-y-3">
+                {% for address in route_data.route %}
+                    {% if not loop.first and not loop.last %}
+                    {% set delivery_info = delivery_status.deliveries.get(address) if delivery_status else None %}
+                    {% set status = delivery_info.status if delivery_info else 'pending' %}
+                    
+                    <div class="delivery-item {{ status }} rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-2">
+                                    <span class="text-lg font-medium text-white mr-3">Stop {{ loop.index - 1 }}</span>
+                                    <span class="status-badge status-{{ status }}">{{ status.title() }}</span>
+                                </div>
+                                <div class="text-gray-300 mb-2">{{ address }}</div>
+                                {% if route_data.stop_counts and route_data.stop_counts[address] %}
+                                <div class="text-sm text-purple-400">
+                                    <i class="fas fa-box mr-1"></i>
+                                    {{ route_data.stop_counts[address] }} deliveries
+                                </div>
+                                {% endif %}
+                                {% if delivery_info %}
+                                <div class="text-sm text-gray-500 mt-2">
+                                    Updated: {{ delivery_info.timestamp[:19].replace('T', ' ') if delivery_info.timestamp else 'Unknown' }}
+                                </div>
+                                {% if delivery_info.notes %}
+                                <div class="text-sm text-gray-400 mt-1">
+                                    <strong>Notes:</strong> {{ delivery_info.notes }}
+                                </div>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCHBzKvpPE6lyMrBLf4EZtmWUu1wLaolgM&libraries=places,geometry"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const routeId = '{{ route_id }}';
+        let map = null;
+        let routeLayers = [];
+        let markers = [];
+        let driverMarker = null;
+        let nextStopLine = null;
+
+        // Route data
+        const routeAddresses = {{ route_data.route | tojson }};
+        const driverLocation = {{ driver_location | tojson if driver_location else 'null' }};
+
+        // Route colors matching front page
+        const routeColors = ['#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5A2B'];
+
+        // Route timing variables
+        let adminTimerInterval = null;
+        let routeStartTime = null;
+
+        // Initialize map when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            if (driverLocation) {
+                updateLocationInfo();
+            }
+            checkRouteStatus();
+        });
+
+        function initMap() {
+            // Initialize Leaflet map (same as front page)
+            const mapCenter = driverLocation ?
+                [driverLocation.latitude, driverLocation.longitude] :
+                [52.3068, -1.9465]; // Default to Redditch
+
+            map = L.map('map', {
+                center: mapCenter,
+                zoom: 13,
+                zoomControl: true,
+                scrollWheelZoom: true
+            });
+
+            // Add dark tile layer (exactly same as front page)
+            L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>',
+                maxZoom: 20,
+                minZoom: 3
+            }).addTo(map);
+
+            // Display route
+            displayRoute();
+
+            // Add driver location if available
+            if (driverLocation) {
+                addDriverMarker();
+                findNearbyAddress();
+                calculateNextStopDistance();
+            }
+        }
+
+        async function displayRoute() {
+            if (routeAddresses.length < 2) return;
+
+            try {
+                // Clear existing layers
+                routeLayers.forEach(layer => map.removeLayer(layer));
+                markers.forEach(marker => map.removeLayer(marker));
+                routeLayers = [];
+                markers = [];
+
+                // Geocode all addresses first
+                const geocodedAddresses = [];
+                for (const address of routeAddresses) {
+                    try {
+                        const coords = await geocodeAddress(address);
+                        geocodedAddresses.push({ address, coords });
+                    } catch (error) {
+                        console.error(`Failed to geocode ${address}:`, error);
+                    }
+                }
+
+                // Add markers for each stop
+                geocodedAddresses.forEach((item, index) => {
+                    const { address, coords } = item;
+
+                    let markerIcon, markerColor, markerText;
+
+                    if (index === 0 || index === geocodedAddresses.length - 1) {
+                        // Depot markers
+                        markerColor = '#8B5CF6';
+                        markerText = 'D';
+                    } else {
+                        // Delivery stop markers - check if completed
+                        const deliveryStatus = {{ delivery_status.deliveries | tojson if delivery_status else '{}' }};
+                        const status = deliveryStatus[address];
+
+                        if (status && status.status === 'completed') {
+                            markerColor = '#10B981'; // Green for completed
+                        } else if (status && status.status === 'failed') {
+                            markerColor = '#EF4444'; // Red for failed
+                        } else {
+                            markerColor = '#F59E0B'; // Orange for pending
+                        }
+                        markerText = index.toString();
+                    }
+
+                    // Create custom marker icon
+                    const markerHtml = `
+                        <div style="
+                            background-color: ${markerColor};
+                            width: 30px;
+                            height: 30px;
+                            border-radius: 50%;
+                            border: 3px solid white;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 12px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        ">${markerText}</div>
+                    `;
+
+                    const marker = L.marker([coords.lat, coords.lng], {
+                        icon: L.divIcon({
+                            html: markerHtml,
+                            className: 'custom-marker',
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15]
+                        })
+                    }).addTo(map);
+
+                    // Add popup with address and status
+                    let statusText = '';
+                    if (index !== 0 && index !== geocodedAddresses.length - 1) {
+                        const deliveryStatus = {{ delivery_status.deliveries | tojson if delivery_status else '{}' }};
+                        const status = deliveryStatus[address];
+                        if (status) {
+                            statusText = `<div style="color: ${markerColor}; font-size: 11px; margin-top: 2px;">
+                                Status: ${status.status.charAt(0).toUpperCase() + status.status.slice(1)}
+                            </div>`;
+                        }
+                    }
+
+                    marker.bindPopup(`
+                        <div style="color: #333; font-weight: bold;">
+                            ${index === 0 || index === geocodedAddresses.length - 1 ? 'Depot' : `Stop ${index}`}
+                        </div>
+                        <div style="color: #666; font-size: 12px; margin-top: 4px;">
+                            ${address}
+                        </div>
+                        ${statusText}
+                    `);
+
+                    markers.push(marker);
+                });
+
+                // Only draw full route path if no driver location
+                // If driver location exists, we'll draw driver-to-next-stop line separately
+                if (!driverLocation && geocodedAddresses.length >= 2) {
+                    await drawRoutePath(geocodedAddresses);
+                }
+
+                // Fit map to show all markers and driver
+                const allMarkers = [...markers];
+                if (driverMarker) {
+                    allMarkers.push(driverMarker);
+                }
+
+                if (allMarkers.length > 0) {
+                    const group = new L.featureGroup(allMarkers);
+                    map.fitBounds(group.getBounds().pad(0.1));
+                }
+
+            } catch (error) {
+                console.error('Error displaying route:', error);
+            }
+        }
+
+        async function drawRoutePath(geocodedAddresses) {
+            try {
+                // Use exact same approach as front page
+                const directionsService = new google.maps.DirectionsService();
+
+                // Draw route segments between consecutive points (same as front page)
+                for (let i = 0; i < geocodedAddresses.length - 1; i++) {
+                    const start = geocodedAddresses[i].address;
+                    const end = geocodedAddresses[i + 1].address;
+
+                    console.log(`Getting directions from ${start} to ${end}`);
+
+                    try {
+                        const result = await directionsService.route({
+                            origin: start,
+                            destination: end,
+                            travelMode: google.maps.TravelMode.DRIVING
+                        });
+
+                        if (result.status === 'OK') {
+                            // Extract path from Google Directions result
+                            const route = result.routes[0].overview_path;
+                            const pathCoords = route.map(point => [point.lat(), point.lng()]);
+
+                            // Draw route segment on Leaflet map (exact same styling as front page)
+                            const routeLine = L.polyline(pathCoords, {
+                                color: routeColors[0], // Same purple color
+                                weight: 4,
+                                opacity: 0.8,
+                                smoothFactor: 1
+                            }).addTo(map);
+
+                            routeLayers.push(routeLine);
+                        } else {
+                            console.error(`Directions failed for segment ${i}: ${result.status}`);
+                            // Fallback: straight line for this segment
+                            const fallbackCoords = [
+                                [geocodedAddresses[i].coords.lat, geocodedAddresses[i].coords.lng],
+                                [geocodedAddresses[i + 1].coords.lat, geocodedAddresses[i + 1].coords.lng]
+                            ];
+                            const fallbackLine = L.polyline(fallbackCoords, {
+                                color: routeColors[0],
+                                weight: 4,
+                                opacity: 0.6,
+                                dashArray: '10, 10'
+                            }).addTo(map);
+                            routeLayers.push(fallbackLine);
+                        }
+
+                        // Small delay between requests to avoid rate limiting
+                        await new Promise(resolve => setTimeout(resolve, 100));
+
+                    } catch (segmentError) {
+                        console.error(`Error getting directions for segment ${i}:`, segmentError);
+                        // Fallback: straight line for this segment
+                        const fallbackCoords = [
+                            [geocodedAddresses[i].coords.lat, geocodedAddresses[i].coords.lng],
+                            [geocodedAddresses[i + 1].coords.lat, geocodedAddresses[i + 1].coords.lng]
+                        ];
+                        const fallbackLine = L.polyline(fallbackCoords, {
+                            color: routeColors[0],
+                            weight: 4,
+                            opacity: 0.6,
+                            dashArray: '10, 10'
+                        }).addTo(map);
+                        routeLayers.push(fallbackLine);
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error drawing route path:', error);
+                // Complete fallback: draw straight lines between all points
+                const pathCoords = geocodedAddresses.map(item => [item.coords.lat, item.coords.lng]);
+                const routeLine = L.polyline(pathCoords, {
+                    color: routeColors[0],
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '10, 10'
+                }).addTo(map);
+                routeLayers.push(routeLine);
+            }
+        }
+
+        function addDriverMarker() {
+            // Create driver marker with truck icon
+            const driverHtml = `
+                <div style="
+                    background-color: #EF4444;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    border: 4px solid white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 16px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                    position: relative;
+                ">🚛</div>
+            `;
+
+            driverMarker = L.marker([driverLocation.latitude, driverLocation.longitude], {
+                icon: L.divIcon({
+                    html: driverHtml,
+                    className: 'driver-marker',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                }),
+                zIndexOffset: 1000
+            }).addTo(map);
+
+            // Add accuracy circle
+            const accuracyCircle = L.circle([driverLocation.latitude, driverLocation.longitude], {
+                color: '#EF4444',
+                fillColor: '#EF4444',
+                fillOpacity: 0.1,
+                radius: driverLocation.accuracy,
+                weight: 2
+            }).addTo(map);
+
+            // Add popup with driver info
+            driverMarker.bindPopup(`
+                <div style="color: #333; font-weight: bold;">
+                    <i class="fas fa-truck" style="color: #EF4444; margin-right: 8px;"></i>
+                    Driver Location
+                </div>
+                <div style="color: #666; font-size: 12px; margin-top: 4px;">
+                    Accuracy: ${Math.round(driverLocation.accuracy)}m
+                </div>
+            `);
+        }
+
+        async function findNearbyAddress() {
+            try {
+                const geocoder = new google.maps.Geocoder();
+                const latLng = new google.maps.LatLng(driverLocation.latitude, driverLocation.longitude);
+
+                geocoder.geocode({ location: latLng }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        const nearbyAddress = results[0].formatted_address;
+                        document.getElementById('nearby-address').innerHTML = `
+                            <i class="fas fa-map-marker-alt mr-2 text-red-400"></i>
+                            ${nearbyAddress}
+                        `;
+                    } else {
+                        document.getElementById('nearby-address').innerHTML = `
+                            <i class="fas fa-map-marker-alt mr-2 text-red-400"></i>
+                            Location unavailable
+                        `;
+                    }
+                });
+            } catch (error) {
+                console.error('Error finding nearby address:', error);
+                document.getElementById('nearby-address').innerHTML = `
+                    <i class="fas fa-exclamation-triangle mr-2 text-yellow-400"></i>
+                    Unable to determine address
+                `;
+            }
+        }
+
+        async function calculateNextStopDistance() {
+            try {
+                // Find next pending delivery
+                const deliveryStatus = {{ delivery_status.deliveries | tojson if delivery_status else '{}' }};
+                let nextStop = null;
+                let isReturnToDepot = false;
+
+                // Find the first pending stop
+                for (let i = 1; i < routeAddresses.length - 1; i++) {
+                    const address = routeAddresses[i];
+                    const status = deliveryStatus[address];
+                    if (!status || status.status === 'pending') {
+                        nextStop = { address, index: i };
+                        break;
+                    }
+                }
+
+                // If no pending deliveries, return to depot
+                if (!nextStop) {
+                    nextStop = {
+                        address: routeAddresses[routeAddresses.length - 1],
+                        index: 'Depot'
+                    };
+                    isReturnToDepot = true;
+                }
+
+                if (nextStop) {
+                    // Geocode next stop
+                    const nextStopCoords = await geocodeAddress(nextStop.address);
+
+                    // Calculate distance
+                    const distance = calculateDistance(
+                        driverLocation.latitude, driverLocation.longitude,
+                        nextStopCoords.lat, nextStopCoords.lng
+                    );
+
+                    // Update UI
+                    if (isReturnToDepot) {
+                        document.getElementById('next-stop-info').innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <i class="fas fa-home mr-2 text-green-400"></i>
+                                    Return to Depot: ${distance.toFixed(1)} km away
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-400 mt-1">
+                                ${nextStop.address.substring(0, 50)}${nextStop.address.length > 50 ? '...' : ''}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('next-stop-info').innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <i class="fas fa-route mr-2 text-purple-400"></i>
+                                    Stop ${nextStop.index}: ${distance.toFixed(1)} km away
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-400 mt-1">
+                                ${nextStop.address.substring(0, 50)}${nextStop.address.length > 50 ? '...' : ''}
+                            </div>
+                        `;
+                    }
+
+                    // Draw line to next stop (driver to next destination)
+                    if (nextStopLine) {
+                        map.removeLayer(nextStopLine);
+                    }
+
+                    nextStopLine = L.polyline([
+                        [driverLocation.latitude, driverLocation.longitude],
+                        [nextStopCoords.lat, nextStopCoords.lng]
+                    ], {
+                        color: isReturnToDepot ? '#10B981' : '#F59E0B',
+                        weight: 4,
+                        opacity: 0.9,
+                        dashArray: '10, 5'
+                    }).addTo(map);
+
+                    // Add arrow marker at the destination
+                    const arrowHtml = `
+                        <div style="
+                            color: ${isReturnToDepot ? '#10B981' : '#F59E0B'};
+                            font-size: 20px;
+                            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+                        ">➤</div>
+                    `;
+
+                    const arrowMarker = L.marker([nextStopCoords.lat, nextStopCoords.lng], {
+                        icon: L.divIcon({
+                            html: arrowHtml,
+                            className: 'arrow-marker',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        }),
+                        zIndexOffset: 500
+                    }).addTo(map);
+
+                    routeLayers.push(arrowMarker);
+                }
+
+            } catch (error) {
+                console.error('Error calculating next stop distance:', error);
+                document.getElementById('next-stop-info').innerHTML = `
+                    <i class="fas fa-exclamation-triangle mr-2 text-yellow-400"></i>
+                    Unable to calculate distance
+                `;
+            }
+        }
+
+        // Helper functions
+        async function geocodeAddress(address) {
+            return new Promise((resolve, reject) => {
+                const geocoder = new google.maps.Geocoder();
+                geocoder.geocode({ address: address }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        resolve({
+                            lat: results[0].geometry.location.lat(),
+                            lng: results[0].geometry.location.lng()
+                        });
+                    } else {
+                        reject(new Error(`Geocoding failed: ${status}`));
+                    }
+                });
+            });
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        async function updateLocationInfo() {
+            if (driverLocation) {
+                await findNearbyAddress();
+                await calculateNextStopDistance();
+            }
+        }
+
+        function checkRouteStatus() {
+            fetch(`/route/${routeId}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.checkin_time) {
+                        routeStartTime = new Date(data.checkin_time);
+                        showActiveRouteTimer();
+                        updateDeliveryStats(data.delivery_status);
+                    }
+                })
+                .catch(error => console.error('Error checking route status:', error));
+        }
+
+        function showActiveRouteTimer() {
+            document.getElementById('not-checked-in').style.display = 'none';
+            document.getElementById('timing-active').style.display = 'block';
+            document.getElementById('admin-start-time').textContent = `Started: ${routeStartTime.toLocaleTimeString()}`;
+
+            // Start admin timer
+            if (adminTimerInterval) {
+                clearInterval(adminTimerInterval);
+            }
+
+            adminTimerInterval = setInterval(() => {
+                if (routeStartTime) {
+                    const now = new Date();
+                    const elapsed = now - routeStartTime;
+                    const hours = Math.floor(elapsed / (1000 * 60 * 60));
+                    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
+
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    document.getElementById('admin-elapsed-time').textContent = timeString;
+                }
+            }, 1000);
+        }
+
+        function updateDeliveryStats(deliveryStatus) {
+            if (!deliveryStatus || !deliveryStatus.deliveries) return;
+
+            const deliveries = Object.values(deliveryStatus.deliveries);
+            const completed = deliveries.filter(d => d.status === 'completed').length;
+            const totalStops = {{ route_data.num_stops }};
+            const remaining = totalStops - completed;
+
+            document.getElementById('admin-completed-count').textContent = completed;
+            document.getElementById('admin-pending-count').textContent = remaining;
+        }
+
+        function refreshLocation() {
+            fetch(`/route/${routeId}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update timing info
+                    if (data.checkin_time && !routeStartTime) {
+                        routeStartTime = new Date(data.checkin_time);
+                        showActiveRouteTimer();
+                    }
+
+                    // Update delivery stats
+                    updateDeliveryStats(data.delivery_status);
+
+                    // Update location info and map
+                    location.reload(); // Simple refresh for now
+                })
+                .catch(error => console.error('Error refreshing location:', error));
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshLocation, 30000);
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>

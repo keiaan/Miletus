@@ -1,0 +1,22 @@
+{
+  "company_settings": {
+    "EightNode": {
+      "max_miles": 100.0,
+      "max_time": 8.0,
+      "max_stops": 10,
+      "drop_penalty": 2000
+    },
+    "Broughton Storage & Distribution Ltd": {
+      "max_miles": 50.0,
+      "max_time": 6.0,
+      "max_stops": 2,
+      "drop_penalty": 10
+    }
+  },
+  "default_settings": {
+    "max_miles": 100,
+    "max_time": 8,
+    "max_stops": 20,
+    "drop_penalty": 1000
+  }
+}

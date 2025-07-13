@@ -1,0 +1,3182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Route Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2a2a2a;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --accent-purple: #8b5cf6;
+            --accent-purple-dark: #7c3aed;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: rgba(42, 42, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .delivery-item {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .delivery-item.pending {
+            border-left-color: var(--accent-orange);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .delivery-item.completed {
+            border-left-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .delivery-item.failed {
+            border-left-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--accent-red), #dc2626);
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-green));
+            height: 6px;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .status-completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .status-failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+
+            #navigation-map {
+                height: 300px !important;
+            }
+
+            #current-instruction {
+                padding: 1rem;
+            }
+
+            #current-instruction-icon {
+                font-size: 2rem;
+                margin-right: 0.75rem;
+            }
+
+            .grid-cols-2 {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .grid-cols-3 {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+
+            .text-3xl {
+                font-size: 1.5rem;
+            }
+
+            .text-lg {
+                font-size: 1rem;
+            }
+        }
+
+        /* Ensure text is always readable */
+        .text-white {
+            color: #ffffff !important;
+        }
+
+        .text-gray-400 {
+            color: #9ca3af !important;
+        }
+
+        .text-blue-100 {
+            color: #dbeafe !important;
+        }
+
+        /* Navigation Styles - Google Maps-like */
+        .navigation-container {
+            position: relative;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .navigation-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            border-radius: 0;
+        }
+
+        .navigation-header {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            padding: 1rem;
+            color: white;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .navigation-map {
+            height: 400px;
+            position: relative;
+        }
+
+        .navigation-fullscreen .navigation-map {
+            height: calc(100vh - 200px);
+        }
+
+        .navigation-instructions {
+            background: #2a2a2a;
+            padding: 1rem;
+            border-top: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .current-instruction {
+            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .instruction-icon {
+            font-size: 2rem;
+            min-width: 3rem;
+            text-align: center;
+        }
+
+        .instruction-text {
+            flex: 1;
+        }
+
+        .instruction-distance {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #60a5fa;
+        }
+
+        .route-summary {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: #374151;
+            border-radius: 6px;
+        }
+
+        .summary-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .summary-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+        }
+
+        .navigation-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .fullscreen-btn {
+            background: #059669;
+        }
+
+        .fullscreen-btn:hover {
+            background: #047857;
+        }
+
+        #compass-indicator {
+            background: rgba(255, 255, 255, 0.1);
+            cursor: default;
+        }
+
+        #compass-icon {
+            transition: transform 1s ease-out;
+        }
+
+        #following-indicator {
+            background: rgba(16, 185, 129, 0.2);
+            cursor: default;
+        }
+
+        #following-icon {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Hide Leaflet Routing Machine default container */
+        .leaflet-routing-container {
+            display: none !important;
+        }
+
+        /* Custom routing control styles */
+        .leaflet-routing-alternatives-container {
+            display: none !important;
+        }
+
+        /* Ensure map controls are visible in fullscreen */
+        .navigation-fullscreen .leaflet-control-container {
+            z-index: 1001;
+        }
+
+        /* Map rotation styles for heading-up navigation */
+        .leaflet-map-pane {
+            transition: transform 1s ease-out;
+        }
+
+        /* Ensure map tiles load smoothly during rotation */
+        .leaflet-tile-container {
+            transition: transform 1s ease-out;
+        }
+
+        /* Keep zoom controls and attribution in place during rotation */
+        .leaflet-control-zoom,
+        .leaflet-control-attribution {
+            transform: none !important;
+        }
+
+        /* User marker arrow styling */
+        .user-marker-arrow div {
+            transition: transform 1s ease-out;
+        }
+
+        /* Ensure markers stay crisp during rotation */
+        .leaflet-marker-icon {
+            transform-origin: center center;
+        }
+
+        /* Mobile navigation optimizations */
+        @media (max-width: 768px) {
+            .navigation-map {
+                height: 300px;
+            }
+
+            .navigation-fullscreen .navigation-map {
+                height: calc(100vh - 150px);
+            }
+
+            .route-summary {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+
+            .current-instruction {
+                padding: 0.75rem;
+                gap: 0.75rem;
+            }
+
+            .instruction-icon {
+                font-size: 1.5rem;
+                min-width: 2rem;
+            }
+
+            .instruction-distance {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-white">
+                        <i class="fas fa-route mr-3 text-purple-400"></i>
+                        Route Tracker
+                    </h1>
+                    <p class="text-gray-400 mt-1">Driver: {{ route_data.driver_name }}</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-400">Route ID</div>
+                    <div class="text-lg font-mono text-purple-400">{{ route_id }}</div>
+                    <button onclick="initializeGPSTracking()"
+                            class="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs transition-colors duration-300"
+                            title="Refresh GPS location">
+                        <i class="fas fa-location-arrow mr-1"></i>
+                        Refresh GPS
+                    </button>
+                </div>
+            </div>
+
+            <!-- Route Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <div class="text-gray-400 text-sm">Total Distance</div>
+                    <div class="text-xl font-semibold text-white">{{ route_data.total_distance }}</div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <div class="text-gray-400 text-sm">Estimated Time</div>
+                    <div class="text-xl font-semibold text-white">{{ route_data.total_time }}</div>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <div class="text-gray-400 text-sm">Total Stops</div>
+                    <div class="text-xl font-semibold text-white">{{ route_data.num_stops }}</div>
+                </div>
+            </div>
+
+            <!-- Route Check-in -->
+            <div class="mb-4" id="checkin-section">
+                <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-white font-medium">Route Check-in</h4>
+                            <p class="text-green-100 text-sm">Start your route to begin tracking</p>
+                        </div>
+                        <button onclick="checkInRoute()" id="checkin-btn"
+                                class="px-4 py-2 bg-green-800 hover:bg-green-900 rounded text-white transition-colors duration-300">
+                            <i class="fas fa-play mr-2"></i>
+                            Check In
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Route Timer (hidden until checked in) -->
+            <div class="mb-4" id="timer-section" style="display: none;">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <div class="grid grid-cols-3 gap-4 text-center mb-4">
+                        <div>
+                            <div class="text-sm text-gray-400">Started</div>
+                            <div class="text-lg font-semibold text-white" id="start-time">--:--</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400">Elapsed</div>
+                            <div class="text-lg font-semibold text-green-400" id="elapsed-time">00:00:00</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-400">Status</div>
+                            <div class="text-lg font-semibold text-green-400" id="route-status">Active</div>
+                        </div>
+                    </div>
+
+                    <!-- Route Control Buttons -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="stopTimer()" id="stop-timer-btn"
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white transition-colors duration-300">
+                            <i class="fas fa-check mr-2"></i>
+                            Complete Route
+                        </button>
+                        <button onclick="returnToDepot()" id="return-depot-btn"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors duration-300">
+                            <i class="fas fa-home mr-2"></i>
+                            Return to Depot
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>Progress</span>
+                    <span id="progress-text">0 of {{ route_data.num_stops }} completed</span>
+                </div>
+                <div class="bg-gray-700 rounded-full h-2">
+                    <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Navigation Actions -->
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-4">
+                <h4 class="text-white font-medium mb-3">Navigate to Next Stop</h4>
+                <p class="text-blue-100 text-sm mb-4" id="next-stop-address">Finding next delivery...</p>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Built-in Navigation -->
+                    <button onclick="toggleBuiltInNavigation()" id="builtin-nav-btn"
+                            class="px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors duration-300">
+                        <i class="fas fa-map mr-2"></i>
+                        Built-in Navigation
+                    </button>
+
+                    <!-- External Navigation -->
+                    <div class="space-y-2">
+                        <button onclick="navigateToNextStop('google')"
+                                class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm transition-colors duration-300">
+                            <i class="fab fa-google mr-1"></i>
+                            Google Maps
+                        </button>
+                        <button onclick="navigateToNextStop('apple')"
+                                class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm transition-colors duration-300">
+                            <i class="fab fa-apple mr-1"></i>
+                            Apple Maps
+                        </button>
+                    </div>
+                </div>
+
+                <p class="text-yellow-200 text-xs mt-3 text-center">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    External apps may interrupt GPS tracking
+                </p>
+            </div>
+        </div>
+
+        <!-- OpenStreetMaps Navigation -->
+        <div id="builtin-navigation" class="navigation-container mb-6" style="display: none;">
+            <!-- Navigation Header -->
+            <div class="navigation-header">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-route text-xl"></i>
+                        <div>
+                            <h2 class="text-lg font-semibold">Turn-by-Turn Navigation</h2>
+                            <p class="text-sm opacity-90" id="nav-destination">Finding destination...</p>
+                        </div>
+                    </div>
+                    <div class="navigation-controls">
+                        <div class="nav-btn" id="following-indicator" title="Map following driver">
+                            <i class="fas fa-crosshairs text-green-400" id="following-icon"></i>
+                        </div>
+                        <button onclick="resetMapOrientation()" class="nav-btn" id="compass-indicator" title="Reset to North-up">
+                            <i class="fas fa-compass" id="compass-icon"></i>
+                        </button>
+                        <button onclick="toggleFullscreen()" class="nav-btn fullscreen-btn" id="fullscreen-btn">
+                            <i class="fas fa-expand"></i>
+                        </button>
+                        <button onclick="closeNavigation()" class="nav-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Map -->
+            <div id="navigation-map" class="navigation-map"></div>
+
+            <!-- Navigation Instructions -->
+            <div class="navigation-instructions">
+                <!-- Current Instruction -->
+                <div class="current-instruction" id="current-instruction">
+                    <div class="instruction-icon" id="current-instruction-icon">
+                        <i class="fas fa-location-arrow"></i>
+                    </div>
+                    <div class="instruction-text">
+                        <div class="instruction-distance" id="current-instruction-distance">--</div>
+                        <div id="current-instruction-text">Calculating route...</div>
+                    </div>
+                </div>
+
+                <!-- Route Summary -->
+                <div class="route-summary">
+                    <div class="summary-item">
+                        <div class="summary-value" id="total-distance">--</div>
+                        <div class="summary-label">Distance</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="total-time">--</div>
+                        <div class="summary-label">Time</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="arrival-time">--</div>
+                        <div class="summary-label">Arrival</div>
+                    </div>
+                </div>
+
+                <!-- Navigation Actions -->
+                <div class="flex gap-2">
+                    <button onclick="recalculateRoute()" class="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white transition-colors">
+                        <i class="fas fa-route mr-2"></i>
+                        Recalculate
+                    </button>
+                    <button onclick="centerOnLocation()" class="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white transition-colors">
+                        <i class="fas fa-crosshairs mr-2"></i>
+                        Center
+                    </button>
+                    <button onclick="resetMapOrientation()" class="flex-1 bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded text-white transition-colors">
+                        <i class="fas fa-compass mr-2"></i>
+                        Reset
+                    </button>
+                    <button onclick="toggleHeadingUpdates()" id="heading-toggle-btn" class="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-white transition-colors">
+                        <i class="fas fa-ban mr-2"></i>
+                        <span id="heading-toggle-text">Enable Rotation</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Delivery List -->
+        <div class="card rounded-xl p-6">
+            <h2 class="text-xl font-semibold text-white mb-4">
+                <i class="fas fa-list-check mr-2 text-purple-400"></i>
+                Delivery Stops
+            </h2>
+
+            <div id="delivery-list" class="space-y-3">
+                {% for address in route_data.route %}
+                    {% if not loop.first and not loop.last %}
+                    <div class="delivery-item pending rounded-lg p-4" data-address="{{ address }}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center mb-2">
+                                    <span class="text-lg font-medium text-white mr-3">Stop {{ loop.index - 1 }}</span>
+                                    <span class="status-badge status-pending" id="status-{{ loop.index - 1 }}">Pending</span>
+                                </div>
+                                <div class="text-gray-300 mb-2">{{ address }}</div>
+                                {% if route_data.stop_counts and route_data.stop_counts[address] %}
+                                <div class="text-sm text-purple-400">
+                                    <i class="fas fa-box mr-1"></i>
+                                    {{ route_data.stop_counts[address] }} deliveries
+                                </div>
+                                {% endif %}
+                                <div class="text-sm text-gray-500 mt-2" id="timestamp-{{ loop.index - 1 }}"></div>
+                            </div>
+                            <div class="flex flex-col space-y-2 ml-4">
+                                <button onclick="updateDeliveryStatus('{{ address }}', 'completed', {{ loop.index - 1 }})" 
+                                        class="btn-success px-3 py-1 rounded text-white text-sm">
+                                    <i class="fas fa-check mr-1"></i>
+                                    Complete
+                                </button>
+                                <button onclick="showFailureModal('{{ address }}', {{ loop.index - 1 }})" 
+                                        class="btn-danger px-3 py-1 rounded text-white text-sm">
+                                    <i class="fas fa-times mr-1"></i>
+                                    Failed
+                                </button>
+                            </div>
+                        </div>
+                        <div id="notes-{{ loop.index - 1 }}" class="mt-2 text-sm text-gray-400 hidden"></div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- Depot Return Stop -->
+                {% if route_data.route|length > 0 %}
+                <div class="delivery-item pending rounded-lg p-4" data-address="{{ route_data.route[-1] }}" data-is-depot="true">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <span class="text-lg font-medium text-white mr-3">
+                                    <i class="fas fa-home mr-2 text-orange-400"></i>
+                                    Return to Depot
+                                </span>
+                                <span class="status-badge status-pending" id="status-depot">Pending</span>
+                            </div>
+                            <div class="text-gray-300 mb-2">{{ route_data.route[-1] }}</div>
+                            <div class="text-sm text-gray-500 mt-2" id="timestamp-depot"></div>
+                        </div>
+                        <div class="flex flex-col space-y-2 ml-4">
+                            <button onclick="markDepotReturn('{{ route_data.route[-1] }}', 'completed')"
+                                    class="btn-success px-3 py-1 rounded text-white text-sm">
+                                <i class="fas fa-home mr-1"></i>
+                                Back at Depot
+                            </button>
+                        </div>
+                    </div>
+                    <div id="notes-depot" class="mt-2 text-sm text-gray-400 hidden"></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Failure Modal -->
+    <div id="failure-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="card rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-white mb-4">Mark Delivery as Failed</h3>
+            <div class="mb-4">
+                <label class="block text-gray-300 text-sm font-medium mb-2">Reason for failure:</label>
+                <textarea id="failure-notes" 
+                          class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                          rows="3" 
+                          placeholder="e.g., Customer not home, incorrect address, etc."></textarea>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="confirmFailure()" 
+                        class="btn-danger px-4 py-2 rounded text-white flex-1">
+                    Mark as Failed
+                </button>
+                <button onclick="closeFailureModal()" 
+                        class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white flex-1">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAddress = '';
+        let currentStopIndex = 0;
+        const routeId = '{{ route_id }}';
+        let watchId = null;
+        let currentLocation = null;
+        let geofenceRadius = 100; // meters
+
+        // Navigation variables
+        let navMap = null;
+        let routingControl = null;
+        let isNavActive = false;
+        let isFullscreen = false;
+        let currentDestination = null;
+        let currentInstructions = [];
+        let currentHeading = 0;
+        let lastLocation = null;
+        let headingUpdateInterval = null;
+        let shownGeofenceAlerts = new Set(); // Track which addresses have shown alerts
+
+        // Route timing variables
+        let routeStartTime = null;
+        let timerInterval = null;
+        let isCheckedIn = false;
+
+
+
+        // Load existing delivery status and start GPS tracking
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDeliveryStatus();
+            updateProgress();
+            initializeGPSTracking();
+            updateNextStopInfo();
+            checkExistingCheckin();
+
+            // Mark that initial load is complete
+            window.deliveryStatusLoaded = true;
+        });
+
+        function loadDeliveryStatus() {
+            {% if delivery_status and delivery_status.deliveries %}
+            const deliveryStatus = {{ delivery_status.deliveries | tojson }};
+
+            Object.keys(deliveryStatus).forEach(address => {
+                const status = deliveryStatus[address];
+                const deliveryItem = document.querySelector(`[data-address="${address}"]`);
+                if (deliveryItem) {
+                    const isDepot = deliveryItem.getAttribute('data-is-depot') === 'true';
+                    if (isDepot) {
+                        updateDepotUI(status.status, status.timestamp);
+                    } else {
+                        const stopIndex = Array.from(deliveryItem.parentNode.children).indexOf(deliveryItem) + 1;
+                        updateDeliveryUI(address, status.status, stopIndex, status.notes, status.timestamp);
+                    }
+                }
+            });
+            {% endif %}
+        }
+
+        function updateDeliveryStatus(address, status, stopIndex, notes = '') {
+            fetch(`/route/${routeId}/update_delivery`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    address: address,
+                    status: status,
+                    notes: notes
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateDeliveryUI(address, status, stopIndex, notes, data.timestamp);
+                    updateProgress();
+                } else {
+                    alert('Failed to update delivery status');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update delivery status');
+            });
+        }
+
+
+
+        function updateProgress() {
+            const totalStops = {{ route_data.num_stops }} + 1; // Include depot return
+            const completedStops = document.querySelectorAll('.delivery-item.completed').length;
+            const progressPercent = (completedStops / totalStops) * 100;
+
+            document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+
+            // Update text to show depot return status
+            const depotCompleted = document.querySelector('[data-is-depot="true"]').classList.contains('completed');
+            if (depotCompleted) {
+                document.getElementById('progress-text').textContent = `Route completed! All ${totalStops} stops finished`;
+            } else {
+                document.getElementById('progress-text').textContent = `${completedStops} of ${totalStops} completed (including depot return)`;
+            }
+        }
+
+        function showFailureModal(address, stopIndex) {
+            currentAddress = address;
+            currentStopIndex = stopIndex;
+            document.getElementById('failure-modal').classList.remove('hidden');
+            document.getElementById('failure-notes').focus();
+        }
+
+        function closeFailureModal() {
+            document.getElementById('failure-modal').classList.add('hidden');
+            document.getElementById('failure-notes').value = '';
+        }
+
+        function confirmFailure() {
+            const notes = document.getElementById('failure-notes').value;
+            updateDeliveryStatus(currentAddress, 'failed', currentStopIndex, notes);
+            closeFailureModal();
+        }
+
+        function markDepotReturn(depotAddress, status) {
+            fetch(`/route/${routeId}/update_delivery`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    address: depotAddress,
+                    status: status,
+                    notes: 'Returned to depot',
+                    is_depot: true
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateDepotUI(status, data.timestamp);
+                    updateProgress();
+                    showNotification('Successfully marked return to depot!', 'success');
+
+                    // Trigger automatic route checkout
+                    setTimeout(() => {
+                        performRouteCheckout();
+                    }, 2000); // Small delay to let UI update
+                } else {
+                    alert('Failed to update depot return status');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update depot return status');
+            });
+        }
+
+        function updateDepotUI(status, timestamp) {
+            const depotItem = document.querySelector('[data-is-depot="true"]');
+            const statusBadge = document.getElementById('status-depot');
+            const timestampElement = document.getElementById('timestamp-depot');
+
+            // Update classes
+            depotItem.className = `delivery-item ${status} rounded-lg p-4`;
+            statusBadge.className = `status-badge status-${status}`;
+            statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+            // Update timestamp
+            if (timestamp) {
+                const date = new Date(timestamp);
+                timestampElement.textContent = `Updated: ${date.toLocaleString()}`;
+            }
+
+            // Hide button for completed depot return
+            if (status === 'completed') {
+                const button = depotItem.querySelector('button');
+                if (button) button.style.display = 'none';
+            }
+        }
+
+        // GPS Tracking and Geofencing
+        function initializeGPSTracking() {
+            console.log('Initializing GPS tracking...');
+
+            if (!navigator.geolocation) {
+                console.log('Geolocation is not supported by this browser.');
+                showLocationStatus('Geolocation not supported', 'error');
+                return;
+            }
+
+            console.log('Requesting location permission...');
+            showLocationStatus('Requesting location access...', 'info');
+
+            // Request location permission and start tracking
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+
+                    console.log('GPS tracking enabled:', currentLocation);
+                    showLocationStatus('GPS tracking enabled', 'success');
+
+                    // Start continuous tracking
+                    startLocationTracking();
+
+                    // Check geofences for all pending deliveries
+                    checkAllGeofences();
+                },
+                function(error) {
+                    console.error('Error getting location:', error);
+                    console.error('Error code:', error.code);
+                    console.error('Error message:', error.message);
+
+                    let message = 'Location access failed';
+                    let suggestion = '';
+
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Location access denied';
+                            suggestion = 'Please click the location icon in your browser address bar and allow location access, then refresh the page.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Location information unavailable';
+                            suggestion = 'Please check your device GPS settings and try again. Make sure location services are enabled.';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Location request timed out';
+                            suggestion = 'GPS signal may be weak. Try moving to an area with better signal and refresh the page.';
+                            break;
+                        default:
+                            message = 'Unknown location error';
+                            suggestion = 'Please refresh the page and try again.';
+                    }
+
+                    showLocationStatus(message, 'error');
+
+                    // Show detailed error with suggestion
+                    setTimeout(() => {
+                        showDetailedLocationError(message, suggestion);
+                    }, 2000);
+
+                    // Try again with less strict settings
+                    console.log('Retrying with less strict GPS settings...');
+                    retryLocationWithFallback();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000, // Increased timeout
+                    maximumAge: 30000 // Reduced max age
+                }
+            );
+        }
+
+        function retryLocationWithFallback() {
+            console.log('Attempting location with fallback settings...');
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+
+                    console.log('GPS tracking enabled with fallback:', currentLocation);
+                    showLocationStatus('GPS tracking enabled (low accuracy)', 'success');
+
+                    // Start continuous tracking
+                    startLocationTracking();
+
+                    // Check geofences for all pending deliveries
+                    checkAllGeofences();
+                },
+                function(error) {
+                    console.error('Fallback location also failed:', error);
+                    showLocationStatus('GPS completely unavailable', 'error');
+                },
+                {
+                    enableHighAccuracy: false, // Allow less accurate location
+                    timeout: 30000, // Longer timeout
+                    maximumAge: 300000 // Accept older location data (5 minutes)
+                }
+            );
+        }
+
+        function showDetailedLocationError(message, suggestion) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white p-6 rounded-lg shadow-lg z-50 max-w-md';
+            errorDiv.innerHTML = `
+                <div class="text-center">
+                    <i class="fas fa-exclamation-triangle text-3xl mb-4"></i>
+                    <h3 class="text-lg font-bold mb-2">${message}</h3>
+                    <p class="text-sm mb-4">${suggestion}</p>
+                    <button onclick="this.parentElement.parentElement.remove(); initializeGPSTracking();"
+                            class="bg-white text-red-600 px-4 py-2 rounded font-medium mr-2">
+                        Try Again
+                    </button>
+                    <button onclick="this.parentElement.parentElement.remove();"
+                            class="bg-red-700 text-white px-4 py-2 rounded font-medium">
+                        Close
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(errorDiv);
+        }
+
+        function startLocationTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+
+            console.log('Starting continuous location tracking...');
+
+            watchId = navigator.geolocation.watchPosition(
+                function(position) {
+                    // Store previous location for heading calculation
+                    if (currentLocation) {
+                        lastLocation = { ...currentLocation };
+                    }
+
+                    currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+
+                    console.log('Location updated:', currentLocation);
+
+                    // Update location status
+                    updateLocationDisplay();
+
+                    // Check geofences
+                    checkAllGeofences();
+
+                    // Send location to server for tracking
+                    sendLocationUpdate();
+
+                    // Update navigation if active
+                    updateNavigationLocation();
+                },
+                function(error) {
+                    console.error('Error tracking location:', error);
+                    showLocationStatus('GPS tracking interrupted', 'error');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 30000,
+                    maximumAge: 60000
+                }
+            );
+        }
+
+        function checkAllGeofences() {
+            if (!currentLocation) return;
+
+            const deliveryItems = document.querySelectorAll('.delivery-item.pending');
+            deliveryItems.forEach(item => {
+                const address = item.getAttribute('data-address');
+                checkGeofence(address, item);
+            });
+        }
+
+        async function checkGeofence(address, deliveryItem) {
+            try {
+                // Geocode the address to get coordinates
+                const coords = await geocodeAddress(address);
+                if (!coords) return;
+
+                // Calculate distance
+                const distance = calculateDistance(
+                    currentLocation.lat, currentLocation.lng,
+                    coords.lat, coords.lng
+                );
+
+                // Check if within geofence
+                if (distance <= geofenceRadius) {
+                    showGeofenceAlert(address, distance);
+                    highlightNearbyDelivery(deliveryItem, distance);
+                } else {
+                    removeGeofenceHighlight(deliveryItem);
+                }
+            } catch (error) {
+                console.error('Error checking geofence:', error);
+            }
+        }
+
+        async function geocodeAddress(address) {
+            try {
+                // Use a simple geocoding service (you might want to use Google Maps API)
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    return {
+                        lat: parseFloat(data[0].lat),
+                        lng: parseFloat(data[0].lon)
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                return null;
+            }
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c; // Distance in meters
+        }
+
+        function showGeofenceAlert(address, distance) {
+            // Only show alert once per address using our tracking set
+            if (shownGeofenceAlerts.has(address)) return;
+
+            // Also check if alert is already displayed
+            if (document.querySelector(`[data-geofence-alert="${address}"]`)) return;
+
+            // Mark this address as having shown an alert
+            shownGeofenceAlerts.add(address);
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-3 rounded-md shadow-lg z-50 max-w-sm';
+            alertDiv.setAttribute('data-geofence-alert', address);
+            alertDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-map-marker-alt mr-2"></i>
+                    <div>
+                        <div class="font-medium">Near Delivery Location</div>
+                        <div class="text-sm opacity-90">${distance.toFixed(0)}m from ${address.substring(0, 30)}...</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(alertDiv);
+
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 10000);
+        }
+
+        function highlightNearbyDelivery(deliveryItem, distance) {
+            deliveryItem.style.border = '2px solid #10b981';
+            deliveryItem.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)';
+
+            // Add distance indicator
+            let distanceIndicator = deliveryItem.querySelector('.distance-indicator');
+            if (!distanceIndicator) {
+                distanceIndicator = document.createElement('div');
+                distanceIndicator.className = 'distance-indicator text-green-400 text-sm font-medium mt-2';
+                deliveryItem.appendChild(distanceIndicator);
+            }
+            distanceIndicator.innerHTML = `<i class="fas fa-location-arrow mr-1"></i>You are ${distance.toFixed(0)}m away`;
+        }
+
+        function removeGeofenceHighlight(deliveryItem) {
+            deliveryItem.style.border = '';
+            deliveryItem.style.boxShadow = '';
+
+            const distanceIndicator = deliveryItem.querySelector('.distance-indicator');
+            if (distanceIndicator) {
+                distanceIndicator.remove();
+            }
+        }
+
+        function updateLocationDisplay() {
+            // Update location status in header
+            let locationStatus = document.getElementById('location-status');
+            if (!locationStatus) {
+                locationStatus = document.createElement('div');
+                locationStatus.id = 'location-status';
+                locationStatus.className = 'text-sm text-green-400 mt-1';
+                document.querySelector('.text-gray-400').parentNode.appendChild(locationStatus);
+            }
+
+            locationStatus.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i>GPS: ${currentLocation.accuracy.toFixed(0)}m accuracy`;
+        }
+
+        function sendLocationUpdate() {
+            if (!currentLocation) return;
+
+            fetch(`/route/${routeId}/update_location`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    latitude: currentLocation.lat,
+                    longitude: currentLocation.lng,
+                    accuracy: currentLocation.accuracy,
+                    timestamp: new Date().toISOString()
+                })
+            })
+            .catch(error => console.error('Error sending location update:', error));
+        }
+
+        function showLocationStatus(message, type) {
+            // Remove any existing location status
+            const existingStatus = document.querySelector('.location-status-notification');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `location-status-notification fixed top-4 left-4 px-4 py-2 rounded-md text-white z-50 ${
+                type === 'success' ? 'bg-green-600' :
+                type === 'info' ? 'bg-blue-600' : 'bg-red-600'
+            }`;
+
+            const icon = type === 'success' ? 'fa-check-circle' :
+                        type === 'info' ? 'fa-info-circle' : 'fa-exclamation-triangle';
+
+            statusDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+
+            document.body.appendChild(statusDiv);
+
+            // Auto-remove after delay (longer for errors)
+            const delay = type === 'error' ? 8000 : type === 'info' ? 3000 : 5000;
+            setTimeout(() => {
+                if (statusDiv.parentNode) {
+                    statusDiv.remove();
+                }
+            }, delay);
+        }
+
+        // Auto-refresh status every 30 seconds
+        setInterval(() => {
+            fetch(`/route/${routeId}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.delivery_status && data.delivery_status.deliveries) {
+                        // Update UI with latest status
+                        loadDeliveryStatus();
+                        updateProgress();
+                    }
+                })
+                .catch(error => console.error('Error refreshing status:', error));
+        }, 30000);
+
+        // Navigation functions
+        function updateNextStopInfo() {
+            const routeAddresses = {{ route_data.route | tojson }};
+            let nextStop = null;
+            let isReturnToDepot = false;
+
+            // Find the first pending delivery
+            const deliveryItems = document.querySelectorAll('.delivery-item.pending');
+            if (deliveryItems.length > 0) {
+                const firstPendingAddress = deliveryItems[0].getAttribute('data-address');
+                nextStop = firstPendingAddress;
+            } else {
+                // All deliveries completed - return to depot
+                nextStop = routeAddresses[routeAddresses.length - 1]; // Last address is depot
+                isReturnToDepot = true;
+            }
+
+            if (nextStop) {
+                const shortAddress = nextStop.length > 40 ? nextStop.substring(0, 40) + '...' : nextStop;
+                if (isReturnToDepot) {
+                    document.getElementById('next-stop-address').innerHTML = `
+                        <i class="fas fa-home mr-2 text-green-400"></i>
+                        Return to Depot: ${shortAddress}
+                    `;
+                } else {
+                    document.getElementById('next-stop-address').textContent = shortAddress;
+                }
+            } else {
+                document.getElementById('next-stop-address').textContent = 'No route information available';
+            }
+        }
+
+        function navigateToNextStop(platform) {
+            const routeAddresses = {{ route_data.route | tojson }};
+            const deliveryItems = document.querySelectorAll('.delivery-item.pending');
+            let nextStopAddress;
+
+            if (deliveryItems.length > 0) {
+                // Navigate to next delivery
+                nextStopAddress = deliveryItems[0].getAttribute('data-address');
+            } else {
+                // All deliveries completed - navigate to depot
+                nextStopAddress = routeAddresses[routeAddresses.length - 1];
+            }
+
+            if (platform === 'google' || platform === 'apple') {
+                // Warn about GPS tracking loss
+                const confirmed = confirm(
+                    '⚠️ GPS TRACKING WARNING ⚠️\n\n' +
+                    'Opening external navigation app will pause GPS tracking.\n\n' +
+                    'Your location will NOT be visible to dispatch until you return to this page.\n\n' +
+                    'For continuous tracking, use "Web Nav" instead.\n\n' +
+                    'Continue with external app?'
+                );
+
+                if (!confirmed) {
+                    return;
+                }
+
+                // Show reminder notification
+                setTimeout(() => {
+                    showTrackingReminder();
+                }, 3000);
+            }
+
+            if (platform === 'google') {
+                const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(nextStopAddress)}`;
+                window.open(googleUrl, '_blank');
+            } else if (platform === 'apple') {
+                const appleUrl = `http://maps.apple.com/?daddr=${encodeURIComponent(nextStopAddress)}`;
+                window.open(appleUrl, '_blank');
+            } else if (platform === 'webapp') {
+                // Open Google Maps web app for in-browser navigation
+                const webAppUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(nextStopAddress)}&travelmode=driving`;
+                window.open(webAppUrl, '_blank');
+
+                // Show tip about keeping tracking page open
+                showNotification('Navigation opened in new tab. Keep this page open for GPS tracking!', 'info');
+            }
+        }
+
+        function showTrackingReminder() {
+            const reminderDiv = document.createElement('div');
+            reminderDiv.className = 'fixed top-4 right-4 bg-orange-600 text-white px-4 py-3 rounded-md shadow-lg z-50 max-w-sm';
+            reminderDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <div>
+                        <div class="font-medium">GPS Tracking Paused</div>
+                        <div class="text-sm opacity-90">Return to this page to resume tracking</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(reminderDiv);
+
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (reminderDiv.parentNode) {
+                    reminderDiv.remove();
+                }
+            }, 10000);
+        }
+
+        function showNotification(message, type = 'success') {
+            const bgColor = type === 'success' ? 'bg-green-600' : type === 'info' ? 'bg-blue-600' : 'bg-orange-600';
+            const icon = type === 'success' ? 'fa-check-circle' : type === 'info' ? 'fa-info-circle' : 'fa-exclamation-triangle';
+
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `fixed top-4 right-4 ${bgColor} text-white px-4 py-3 rounded-md shadow-lg z-50 max-w-sm`;
+            notificationDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} mr-2"></i>
+                    <div>
+                        <div class="font-medium">${message}</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(notificationDiv);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (notificationDiv.parentNode) {
+                    notificationDiv.remove();
+                }
+            }, 5000);
+        }
+
+        // Update next stop info when delivery status changes
+        function updateDeliveryUI(address, status, stopIndex, notes, timestamp) {
+            const deliveryItem = document.querySelector(`[data-address="${address}"]`);
+            const statusBadge = document.getElementById(`status-${stopIndex}`);
+            const timestampElement = document.getElementById(`timestamp-${stopIndex}`);
+            const notesElement = document.getElementById(`notes-${stopIndex}`);
+
+            // Update classes
+            deliveryItem.className = `delivery-item ${status} rounded-lg p-4`;
+            statusBadge.className = `status-badge status-${status}`;
+            statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+            // Update timestamp
+            if (timestamp) {
+                const date = new Date(timestamp);
+                timestampElement.textContent = `Updated: ${date.toLocaleString()}`;
+            }
+
+            // Update notes
+            if (notes) {
+                notesElement.textContent = `Notes: ${notes}`;
+                notesElement.classList.remove('hidden');
+            }
+
+            // Hide buttons for completed/failed deliveries
+            if (status !== 'pending') {
+                const buttons = deliveryItem.querySelectorAll('button');
+                buttons.forEach(btn => btn.style.display = 'none');
+            }
+
+            // Update next stop info
+            updateNextStopInfo();
+
+            // Only recalculate navigation if we've completed all deliveries and need to route to depot
+            if (isNavActive) {
+                const remainingDeliveries = document.querySelectorAll('.delivery-item.pending:not([data-is-depot])');
+                const depotPending = document.querySelector('.delivery-item.pending[data-is-depot="true"]');
+
+                // Only recalculate if all deliveries are done and we need to route to depot
+                if (remainingDeliveries.length === 0 && depotPending) {
+                    console.log('All deliveries completed, routing to depot');
+                    showNotification('All deliveries completed! Routing to depot.', 'success');
+                    setTimeout(() => {
+                        findNextDestinationOSM();
+                    }, 1000);
+                } else {
+                    console.log('Delivery status updated, but continuing current route');
+                    // Just update the destination text without recalculating
+                    updateNavigationDestinationText();
+                    showNotification('Delivery updated - continuing current route', 'success');
+                }
+            }
+        }
+
+
+
+        // OpenStreetMaps Navigation Functions
+        function toggleBuiltInNavigation() {
+            const navSection = document.getElementById('builtin-navigation');
+            const navBtn = document.getElementById('builtin-nav-btn');
+
+            if (navSection.style.display === 'none') {
+                navSection.style.display = 'block';
+                navBtn.innerHTML = '<i class="fas fa-times mr-1"></i><div class="text-xs">Close Nav</div>';
+
+                // Wait for both GPS location and delivery status to be loaded
+                if (currentLocation && window.deliveryStatusLoaded) {
+                    initOSMNavigation();
+                } else {
+                    console.log('Waiting for GPS location and delivery status...');
+                    updateInstructionUI('🔄', 'Initializing...', 'Loading GPS and delivery status');
+
+                    // Retry every 2 seconds for up to 15 seconds
+                    let retryCount = 0;
+                    const maxRetries = 7;
+                    const retryInterval = setInterval(() => {
+                        retryCount++;
+                        if (currentLocation && window.deliveryStatusLoaded) {
+                            clearInterval(retryInterval);
+                            console.log('Both GPS and delivery status ready, initializing navigation');
+                            initOSMNavigation();
+                        } else if (retryCount >= maxRetries) {
+                            clearInterval(retryInterval);
+                            if (!currentLocation) {
+                                updateInstructionUI('⚠️', 'GPS timeout', 'Unable to get location');
+                            } else {
+                                updateInstructionUI('⚠️', 'Status timeout', 'Unable to load delivery status');
+                            }
+                        } else {
+                            // Update status message
+                            const missing = [];
+                            if (!currentLocation) missing.push('GPS');
+                            if (!window.deliveryStatusLoaded) missing.push('delivery status');
+                            updateInstructionUI('🔄', `Waiting for ${missing.join(' and ')}...`, 'Please wait');
+                        }
+                    }, 2000);
+                }
+            } else {
+                closeNavigation();
+            }
+        }
+
+        function updateNavigationDestinationText() {
+            // Update the destination text without recalculating the route
+            const deliveryItems = document.querySelectorAll('.delivery-item.pending');
+            if (deliveryItems.length > 0) {
+                const firstPendingItem = deliveryItems[0];
+                const isDepotItem = firstPendingItem.getAttribute('data-is-depot') === 'true';
+                const destination = firstPendingItem.getAttribute('data-address');
+
+                const destinationType = isDepotItem ? 'Returning to depot' : 'Next delivery stop';
+                const shortAddress = destination.length > 50 ? destination.substring(0, 50) + '...' : destination;
+
+                document.getElementById('nav-destination').textContent = `${destinationType}: ${shortAddress}`;
+                console.log('Updated destination text without recalculating route');
+            }
+        }
+
+        function closeNavigation() {
+            const navSection = document.getElementById('builtin-navigation');
+            const navBtn = document.getElementById('builtin-nav-btn');
+
+            navSection.style.display = 'none';
+            navBtn.innerHTML = '<i class="fas fa-map mr-1"></i><div class="text-xs">Built-in Nav</div>';
+            isNavActive = false;
+
+            // Stop all navigation updates
+            stopHeadingUpdates();
+            stopLiveNavigationUpdates();
+
+            // Exit fullscreen if active
+            if (isFullscreen) {
+                toggleFullscreen();
+            }
+
+            // Clean up map and routing
+            if (routingControl) {
+                navMap.removeControl(routingControl);
+                routingControl = null;
+            }
+            if (navMap) {
+                navMap.remove();
+                navMap = null;
+            }
+
+            // Reset navigation variables
+            currentHeading = 0;
+            lastLocation = null;
+            currentRoute = null;
+            currentInstructions = null;
+            currentInstructionIndex = 0;
+        }
+
+        function initOSMNavigation() {
+            console.log('Initializing OpenStreetMaps navigation');
+            console.log('Current location:', currentLocation);
+            console.log('Leaflet available:', typeof L !== 'undefined');
+            console.log('Leaflet Routing available:', typeof L.Routing !== 'undefined');
+
+            if (!currentLocation) {
+                console.log('No GPS location available');
+                document.getElementById('nav-destination').textContent = 'GPS location required';
+                updateInstructionUI('⚠️', 'GPS location required', 'Please enable location services');
+                return;
+            }
+
+            // Initialize Leaflet map with driving-focused settings
+            try {
+                navMap = L.map('navigation-map', {
+                    center: [currentLocation.lat, currentLocation.lng],
+                    zoom: 18, // Closer zoom like Google Maps driving mode
+                    zoomControl: true,
+                    scrollWheelZoom: true,
+                    bearing: 0, // Initial bearing
+                    pitch: 0    // Flat view for now
+                });
+
+                // Add double-tap to reset orientation
+                let lastTap = 0;
+                navMap.on('click', function(e) {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 500 && tapLength > 0) {
+                        // Double tap detected
+                        console.log('Double tap detected, resetting map orientation');
+                        resetMapOrientation();
+                        e.originalEvent.preventDefault();
+                    }
+                    lastTap = currentTime;
+                });
+
+                console.log('Map initialized successfully');
+
+                // Add dark theme tiles (same as front page)
+                L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>',
+                    maxZoom: 20,
+                    minZoom: 3
+                }).addTo(navMap);
+
+                console.log('Map tiles added');
+
+                // Find and navigate to next destination
+                findNextDestinationOSM();
+
+                // Start heading updates for map rotation
+                startHeadingUpdates();
+
+                isNavActive = true;
+                console.log('Navigation initialized successfully');
+            } catch (error) {
+                console.error('Error initializing navigation:', error);
+                updateInstructionUI('⚠️', 'Navigation initialization failed', error.message);
+            }
+        }
+
+        function findNextDestinationOSM() {
+            console.log('Finding next destination for OSM navigation');
+
+            // Ensure delivery status is loaded before proceeding
+            if (!window.deliveryStatusLoaded) {
+                console.log('Delivery status not yet loaded, waiting...');
+                updateInstructionUI('🔄', 'Loading delivery status...', 'Please wait');
+                setTimeout(() => {
+                    if (window.deliveryStatusLoaded) {
+                        findNextDestinationOSM();
+                    }
+                }, 1000);
+                return;
+            }
+
+            // Find next delivery or return to depot
+            const routeAddresses = {{ route_data.route | tojson }};
+            const deliveryItems = document.querySelectorAll('.delivery-item.pending');
+            let destination;
+            let isReturnToDepot = false;
+            let destinationType = '';
+
+            console.log('Route addresses:', routeAddresses);
+            console.log('Found', deliveryItems.length, 'pending deliveries');
+            console.log('All delivery items:', document.querySelectorAll('.delivery-item'));
+
+            if (deliveryItems.length > 0) {
+                // Check if the first pending item is the depot
+                const firstPendingItem = deliveryItems[0];
+                const isDepotItem = firstPendingItem.getAttribute('data-is-depot') === 'true';
+
+                destination = firstPendingItem.getAttribute('data-address');
+
+                if (isDepotItem) {
+                    destinationType = 'Returning to depot';
+                    isReturnToDepot = true;
+                    console.log('Next stop is depot return:', destination);
+                } else {
+                    destinationType = 'Next delivery stop';
+                    console.log('Next delivery:', destination);
+                }
+            } else {
+                // This shouldn't happen now since depot is always a pending item
+                console.log('No pending items found at all - this is unexpected');
+                destination = null;
+            }
+
+            if (!destination) {
+                console.error('No destination found!');
+                console.error('Route addresses:', routeAddresses);
+                console.error('Delivery items found:', deliveryItems.length);
+                console.error('All items:', document.querySelectorAll('.delivery-item'));
+
+                // Last resort: try to fetch fresh route status from server
+                console.log('Attempting to fetch fresh route status from server...');
+                updateInstructionUI('🔄', 'Fetching route data...', 'Checking server for route information');
+
+                fetch(`/route/${routeId}/status`)
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Server route status:', data);
+                        if (data.route_data && data.route_data.route && data.route_data.route.length > 0) {
+                            const serverRouteAddresses = data.route_data.route;
+                            const serverDestination = serverRouteAddresses[serverRouteAddresses.length - 1];
+                            console.log('Found depot from server:', serverDestination);
+
+                            // Update UI and calculate route
+                            const shortAddress = serverDestination.length > 50 ? serverDestination.substring(0, 50) + '...' : serverDestination;
+                            document.getElementById('nav-destination').textContent = `Returning to depot: ${shortAddress}`;
+                            currentDestination = serverDestination;
+
+                            showNotification('Route data refreshed from server', 'success');
+                            updateInstructionUI('🏠', 'Routing to depot', 'All deliveries completed');
+                            calculateOSMRoute(serverDestination, true);
+                        } else {
+                            document.getElementById('nav-destination').textContent = 'No destination found';
+                            updateInstructionUI('⚠️', 'No destination found', 'Unable to determine route');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching route status:', error);
+                        document.getElementById('nav-destination').textContent = 'No destination found';
+                        updateInstructionUI('⚠️', 'No destination found', 'Unable to determine route');
+                    });
+                return;
+            }
+
+            // Update UI with destination type
+            const shortAddress = destination.length > 50 ? destination.substring(0, 50) + '...' : destination;
+            document.getElementById('nav-destination').textContent = `${destinationType}: ${shortAddress}`;
+            currentDestination = destination;
+
+            // Show notification about route change
+            if (isReturnToDepot) {
+                showNotification('All deliveries completed! Routing to depot.', 'success');
+                updateInstructionUI('🏠', 'Routing to depot', 'All deliveries completed');
+            } else {
+                updateInstructionUI('📦', 'Routing to delivery', 'Next stop on route');
+            }
+
+            // Calculate route with turn-by-turn directions
+            calculateOSMRoute(destination, isReturnToDepot);
+        }
+
+        async function tryMultipleGeocodingStrategies(originalAddress) {
+            console.log('Trying multiple geocoding strategies for:', originalAddress);
+
+            // Strategy 1: Original address with UK bias
+            let geocodeQuery = originalAddress.includes('UK') ? originalAddress : `${originalAddress}, UK`;
+            console.log('Strategy 1 - Original with UK:', geocodeQuery);
+
+            let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=3&countrycodes=gb`);
+            let data = await response.json();
+
+            if (data && data.length > 0) {
+                console.log('Strategy 1 succeeded');
+                return data;
+            }
+
+            // Strategy 2: Remove business name, keep address only
+            let addressOnly = originalAddress;
+            // Remove business name (everything before the first comma or "Unit")
+            if (addressOnly.includes(',')) {
+                const parts = addressOnly.split(',');
+                if (parts.length > 1) {
+                    // Skip first part if it looks like a business name
+                    addressOnly = parts.slice(1).join(',').trim();
+                }
+            } else if (addressOnly.toLowerCase().includes('unit')) {
+                // Start from "Unit" if present
+                const unitIndex = addressOnly.toLowerCase().indexOf('unit');
+                addressOnly = addressOnly.substring(unitIndex);
+            }
+
+            geocodeQuery = addressOnly.includes('UK') ? addressOnly : `${addressOnly}, UK`;
+            console.log('Strategy 2 - Address only:', geocodeQuery);
+
+            response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=3&countrycodes=gb`);
+            data = await response.json();
+
+            if (data && data.length > 0) {
+                console.log('Strategy 2 succeeded');
+                return data;
+            }
+
+            // Strategy 3: Just postcode and area
+            const postcodeMatch = originalAddress.match(/([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})/i);
+            if (postcodeMatch) {
+                geocodeQuery = `${postcodeMatch[1]}, Redditch, UK`;
+                console.log('Strategy 3 - Postcode area:', geocodeQuery);
+
+                response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=3&countrycodes=gb`);
+                data = await response.json();
+
+                if (data && data.length > 0) {
+                    console.log('Strategy 3 succeeded');
+                    return data;
+                }
+            }
+
+            // Strategy 4: Just the street name and postcode
+            const streetMatch = originalAddress.match(/([\w\s]+(?:Road|Rd|Street|St|Avenue|Ave|Lane|Ln|Drive|Dr|Close|Cl))/i);
+            if (streetMatch && postcodeMatch) {
+                geocodeQuery = `${streetMatch[1]}, ${postcodeMatch[1]}, UK`;
+                console.log('Strategy 4 - Street and postcode:', geocodeQuery);
+
+                response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=3&countrycodes=gb`);
+                data = await response.json();
+
+                if (data && data.length > 0) {
+                    console.log('Strategy 4 succeeded');
+                    return data;
+                }
+            }
+
+            // Strategy 5: Broader search without country restriction
+            geocodeQuery = originalAddress;
+            console.log('Strategy 5 - Broader search:', geocodeQuery);
+
+            response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=5`);
+            data = await response.json();
+
+            if (data && data.length > 0) {
+                // Filter for UK results
+                const ukResults = data.filter(result =>
+                    result.display_name.toLowerCase().includes('united kingdom') ||
+                    result.display_name.toLowerCase().includes('england') ||
+                    result.display_name.toLowerCase().includes('redditch')
+                );
+                if (ukResults.length > 0) {
+                    console.log('Strategy 5 succeeded with UK filtering');
+                    return ukResults;
+                }
+                console.log('Strategy 5 succeeded without filtering');
+                return data;
+            }
+
+            console.log('All geocoding strategies failed');
+            return null;
+        }
+
+        async function calculateOSMRoute(destination, isReturnToDepot = false) {
+            console.log('Calculating OSM route to:', destination);
+            console.log('Is return to depot:', isReturnToDepot);
+
+            // Update UI to show loading
+            updateInstructionUI('🔄', 'Calculating route...', 'Finding best route');
+            updateSummaryUI('--', '--', '--');
+
+            try {
+                // Add UK bias for better geocoding results
+                const geocodeQuery = destination.includes('UK') ? destination : `${destination}, UK`;
+                console.log('Geocoding query:', geocodeQuery);
+
+                // Try multiple geocoding strategies for better results
+                let data = await tryMultipleGeocodingStrategies(destination);
+
+                console.log('Final geocoding response:', data);
+
+                if (!data || data.length === 0) {
+                    console.error(`Address not found after all attempts: ${destination}`);
+                    throw new Error(`Address not found: ${destination}`);
+                }
+
+                const destLat = parseFloat(data[0].lat);
+                const destLng = parseFloat(data[0].lon);
+
+                console.log('Destination coordinates:', destLat, destLng);
+
+                // Try to create routing control with fallback
+                if (routingControl) {
+                    navMap.removeControl(routingControl);
+                }
+
+                // Check if Leaflet Routing Machine is available
+                if (typeof L.Routing === 'undefined') {
+                    console.error('Leaflet Routing Machine not loaded, falling back to simple routing');
+                    createSimpleRoute(destLat, destLng, isReturnToDepot);
+                    return;
+                }
+
+                try {
+                    routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(currentLocation.lat, currentLocation.lng),
+                            L.latLng(destLat, destLng)
+                        ],
+                        routeWhileDragging: false,
+                        addWaypoints: false,
+                        router: L.Routing.osrmv1({
+                            serviceUrl: 'https://router.project-osrm.org/route/v1'
+                        }),
+                        createMarker: function(i, waypoint, n) {
+                            // Custom markers
+                            if (i === 0) {
+                                // Start marker (current location) - Google Maps style arrow
+                                return L.marker(waypoint.latLng, {
+                                    icon: L.divIcon({
+                                        html: `<div style="
+                                            background: #4285f4;
+                                            width: 20px;
+                                            height: 20px;
+                                            border-radius: 50%;
+                                            border: 3px solid white;
+                                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            color: white;
+                                            font-size: 10px;
+                                            transform: rotate(${currentHeading}deg);
+                                        ">▲</div>`,
+                                        className: 'user-marker-arrow',
+                                        iconSize: [20, 20],
+                                        iconAnchor: [10, 10]
+                                    })
+                                });
+                            } else {
+                                // Destination marker - different icon for depot vs delivery
+                                const isDepot = isReturnToDepot;
+                                const markerIcon = isDepot ? '🏠' : '📦';
+                                const markerColor = isDepot ? '#f59e0b' : '#10b981'; // Orange for depot, green for delivery
+
+                                return L.marker(waypoint.latLng, {
+                                    icon: L.divIcon({
+                                        html: `<div style="background: ${markerColor}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${markerIcon}</div>`,
+                                        className: 'destination-marker',
+                                        iconSize: [24, 24],
+                                        iconAnchor: [12, 12]
+                                    })
+                                });
+                            }
+                        },
+                        lineOptions: {
+                            styles: [{
+                                color: '#8B5CF6',
+                                weight: 6,
+                                opacity: 0.8
+                            }]
+                        }
+                    }).on('routesfound', function(e) {
+                        const routes = e.routes;
+                        const route = routes[0];
+
+                        // Store route data for live navigation
+                        currentRoute = route;
+                        currentInstructions = route.instructions;
+                        currentInstructionIndex = 0;
+
+                        // Debug: Log route structure
+                        console.log('Route found with', route.instructions.length, 'instructions');
+                        console.log('Route structure:', route);
+                        console.log('First few instructions:', route.instructions.slice(0, 3));
+                        console.log('Route coordinates available:', !!route.coordinates);
+                        console.log('Route waypoints available:', !!route.waypoints);
+
+                        // Update instructions with initial values
+                        updateNavigationInstructions(route);
+
+                        // Start live navigation updates
+                        startLiveNavigationUpdates();
+
+                        console.log('Live navigation started');
+                    }).on('routingerror', function(e) {
+                        console.error('Routing error:', e);
+                        console.log('Falling back to simple routing');
+                        createSimpleRoute(destLat, destLng, isReturnToDepot);
+                    }).addTo(navMap);
+                } catch (error) {
+                    console.error('Error creating routing control:', error);
+                    createSimpleRoute(destLat, destLng, isReturnToDepot);
+                }
+
+            } catch (error) {
+                console.error('Error calculating route:', error);
+                updateInstructionUI('⚠️', 'Route calculation failed', error.message);
+            }
+        }
+
+        function createSimpleRoute(destLat, destLng, isReturnToDepot = false) {
+            console.log('Creating simple route fallback');
+
+            // Add markers manually
+            addSimpleMarkers(destLat, destLng, isReturnToDepot);
+
+            // Draw simple route line
+            const routeLine = L.polyline([
+                [currentLocation.lat, currentLocation.lng],
+                [destLat, destLng]
+            ], {
+                color: '#8B5CF6',
+                weight: 6,
+                opacity: 0.8,
+                dashArray: '10, 5'
+            }).addTo(navMap);
+
+            // Calculate distance and time
+            const distance = calculateDistance(currentLocation.lat, currentLocation.lng, destLat, destLng);
+            const distanceInMiles = distance.toFixed(1);
+            const estimatedMinutes = Math.round(distance / 0.5); // Rough estimate: 30 mph average
+            const arrivalTime = new Date(Date.now() + estimatedMinutes * 60000);
+
+            // Update UI with simple instructions
+            const direction = getDirection(currentLocation.lat, currentLocation.lng, destLat, destLng);
+            const destinationType = isReturnToDepot ? 'depot' : 'delivery stop';
+            updateInstructionUI(
+                '<i class="fas fa-arrow-up"></i>',
+                distanceInMiles + ' mi',
+                `Head ${direction} towards ${destinationType}`
+            );
+
+            updateSummaryUI(
+                distanceInMiles + ' mi',
+                estimatedMinutes + ' min',
+                arrivalTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            );
+
+            // Fit map to show both points
+            const bounds = L.latLngBounds([
+                [currentLocation.lat, currentLocation.lng],
+                [destLat, destLng]
+            ]);
+            navMap.fitBounds(bounds.pad(0.1));
+        }
+
+        function addSimpleMarkers(destLat, destLng, isReturnToDepot = false) {
+            // Add user location marker - Google Maps style arrow
+            const userMarker = L.marker([currentLocation.lat, currentLocation.lng], {
+                icon: L.divIcon({
+                    html: `<div style="
+                        background: #4285f4;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 10px;
+                        transform: rotate(${currentHeading}deg);
+                    ">▲</div>`,
+                    className: 'user-marker-arrow',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(navMap);
+
+            // Add destination marker with appropriate icon
+            const markerIcon = isReturnToDepot ? '🏠' : '📦';
+            const markerColor = isReturnToDepot ? '#f59e0b' : '#10b981'; // Orange for depot, green for delivery
+
+            const destMarker = L.marker([destLat, destLng], {
+                icon: L.divIcon({
+                    html: `<div style="background: ${markerColor}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">${markerIcon}</div>`,
+                    className: 'destination-marker',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(navMap);
+        }
+
+        function getDirection(lat1, lng1, lat2, lng2) {
+            const dLng = lng2 - lng1;
+            const dLat = lat2 - lat1;
+            const angle = Math.atan2(dLng, dLat) * 180 / Math.PI;
+
+            if (angle >= -22.5 && angle < 22.5) return 'north';
+            if (angle >= 22.5 && angle < 67.5) return 'northeast';
+            if (angle >= 67.5 && angle < 112.5) return 'east';
+            if (angle >= 112.5 && angle < 157.5) return 'southeast';
+            if (angle >= 157.5 || angle < -157.5) return 'south';
+            if (angle >= -157.5 && angle < -112.5) return 'southwest';
+            if (angle >= -112.5 && angle < -67.5) return 'west';
+            if (angle >= -67.5 && angle < -22.5) return 'northwest';
+            return 'ahead';
+        }
+
+        function updateNavigationInstructions(route) {
+            // Update current instruction (first step)
+            if (route.instructions && route.instructions.length > 0) {
+                const firstInstruction = route.instructions[0];
+                const icon = getInstructionIcon(firstInstruction.type);
+                const distance = formatDistance(firstInstruction.distance);
+                const text = firstInstruction.text || 'Continue straight';
+
+                updateInstructionUI(icon, distance, text);
+            }
+
+            // Update route summary
+            const totalDistance = (route.summary.totalDistance / 1609.34).toFixed(1); // Convert to miles
+            const totalTime = Math.round(route.summary.totalTime / 60); // Convert to minutes
+            const arrivalTime = new Date(Date.now() + route.summary.totalTime * 1000);
+
+            updateSummaryUI(
+                totalDistance + ' mi',
+                totalTime + ' min',
+                arrivalTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            );
+        }
+
+        function updateInstructionUI(icon, distance, text) {
+            document.getElementById('current-instruction-icon').innerHTML = icon;
+            document.getElementById('current-instruction-distance').textContent = distance;
+            document.getElementById('current-instruction-text').textContent = text;
+        }
+
+        function updateSummaryUI(distance, time, arrival) {
+            document.getElementById('total-distance').textContent = distance;
+            document.getElementById('total-time').textContent = time;
+            document.getElementById('arrival-time').textContent = arrival;
+        }
+
+        function getInstructionIcon(type) {
+            const iconMap = {
+                'Head': '<i class="fas fa-arrow-up"></i>',
+                'Continue': '<i class="fas fa-arrow-up"></i>',
+                'Turn right': '<i class="fas fa-arrow-right"></i>',
+                'Turn left': '<i class="fas fa-arrow-left"></i>',
+                'Sharp right': '<i class="fas fa-share"></i>',
+                'Sharp left': '<i class="fas fa-reply"></i>',
+                'Slight right': '<i class="fas fa-arrow-up" style="transform: rotate(30deg);"></i>',
+                'Slight left': '<i class="fas fa-arrow-up" style="transform: rotate(-30deg);"></i>',
+                'Roundabout': '<i class="fas fa-circle-notch"></i>',
+                'Destination': '<i class="fas fa-flag-checkered"></i>'
+            };
+
+            // Find matching instruction type
+            for (const [key, icon] of Object.entries(iconMap)) {
+                if (type && type.includes(key)) {
+                    return icon;
+                }
+            }
+
+            return '<i class="fas fa-arrow-up"></i>'; // Default
+        }
+
+        function formatDistance(meters) {
+            const miles = meters / 1609.34;
+            if (miles < 0.1) {
+                const feet = meters * 3.28084;
+                return Math.round(feet) + ' ft';
+            } else {
+                return miles.toFixed(1) + ' mi';
+            }
+        }
+
+        // Navigation control functions
+        function toggleFullscreen() {
+            const navContainer = document.getElementById('builtin-navigation');
+            const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+            if (!isFullscreen) {
+                // Enter fullscreen
+                navContainer.classList.add('navigation-fullscreen');
+                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+                isFullscreen = true;
+
+                // Resize map after transition
+                setTimeout(() => {
+                    if (navMap) {
+                        navMap.invalidateSize();
+                    }
+                }, 300);
+            } else {
+                // Exit fullscreen
+                navContainer.classList.remove('navigation-fullscreen');
+                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+                isFullscreen = false;
+
+                // Resize map after transition
+                setTimeout(() => {
+                    if (navMap) {
+                        navMap.invalidateSize();
+                    }
+                }, 300);
+            }
+        }
+
+        let lastManualRecalculation = 0;
+
+        function recalculateRoute() {
+            if (currentDestination && currentLocation) {
+                // Prevent spam clicking - only allow manual recalculation every 10 seconds
+                const now = Date.now();
+                if (now - lastManualRecalculation < 10000) {
+                    const remainingSeconds = Math.ceil((10000 - (now - lastManualRecalculation)) / 1000);
+                    showNotification(`Please wait ${remainingSeconds} seconds before recalculating again`, 'info');
+                    return;
+                }
+
+                lastManualRecalculation = now;
+                console.log('Manual recalculation requested');
+                showNotification('Recalculating route...', 'info');
+                calculateOSMRoute(currentDestination);
+            }
+        }
+
+        function centerOnLocation() {
+            if (navMap && currentLocation) {
+                navMap.setView([currentLocation.lat, currentLocation.lng], 18);
+                // Also update rotation to current heading
+                rotateMapToHeading(currentHeading);
+            }
+        }
+
+        // Heading and rotation functions
+        function startHeadingUpdates() {
+            console.log('Starting heading updates for map rotation and following');
+
+            // Heading updates are disabled by default to prevent random spinning
+            // Users can enable them manually using the toggle button
+            disableHeadingUpdates();
+
+            // Update heading and ensure map follows driver
+            headingUpdateInterval = setInterval(() => {
+                if (currentLocation && isNavActive) {
+                    // Always keep map centered on driver
+                    ensureMapFollowsDriver();
+
+                    // Update heading if we have movement and heading updates are enabled
+                    if (lastLocation && headingUpdatesEnabled) {
+                        updateHeading();
+                    }
+
+                    // Safety check: reset if rotation gets extreme
+                    checkAndFixMapRotation();
+                }
+            }, 2000); // Slower updates to reduce processing
+        }
+
+        function checkAndFixMapRotation() {
+            try {
+                const mapContainer = navMap.getContainer();
+                const mapPane = mapContainer.querySelector('.leaflet-map-pane');
+
+                if (mapPane) {
+                    const transform = mapPane.style.transform;
+                    if (transform && transform.includes('rotate')) {
+                        const rotateMatch = transform.match(/rotate\(([^)]+)\)/);
+                        if (rotateMatch) {
+                            const rotation = parseFloat(rotateMatch[1]);
+                            // If rotation is extreme (more than 720 degrees), reset
+                            if (Math.abs(rotation) > 720) {
+                                console.warn('Extreme rotation detected:', rotation, 'degrees. Resetting...');
+                                resetMapOrientation();
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking map rotation:', error);
+            }
+        }
+
+        function ensureMapFollowsDriver() {
+            if (!navMap || !currentLocation) return;
+
+            const currentCenter = navMap.getCenter();
+            const distance = calculateDistanceInMeters(
+                currentCenter.lat, currentCenter.lng,
+                currentLocation.lat, currentLocation.lng
+            );
+
+            // If map has drifted more than 5 meters from driver position, recenter
+            if (distance > 5) {
+                navMap.setView([currentLocation.lat, currentLocation.lng], 18, {
+                    animate: true,
+                    duration: 0.5
+                });
+                console.log('Recentered map on driver position');
+            }
+        }
+
+        // Disable automatic heading updates to prevent random spinning
+        let headingUpdatesEnabled = false;
+        let lastValidHeading = 0;
+        let headingHistory = [];
+        const MAX_HEADING_HISTORY = 5;
+
+        function updateHeading() {
+            if (!lastLocation || !currentLocation || !headingUpdatesEnabled) return;
+
+            // Calculate distance in meters for more accurate threshold
+            const distance = calculateDistanceInMeters(
+                lastLocation.lat, lastLocation.lng,
+                currentLocation.lat, currentLocation.lng
+            );
+
+            // Only update heading if we've moved a significant distance
+            if (distance < 20) return; // Much higher threshold to prevent GPS noise
+
+            // Calculate heading based on movement
+            const newHeading = calculateBearing(
+                lastLocation.lat, lastLocation.lng,
+                currentLocation.lat, currentLocation.lng
+            );
+
+            // Normalize heading to 0-360 range
+            const normalizedNewHeading = ((newHeading % 360) + 360) % 360;
+
+            // Add to heading history for smoothing
+            headingHistory.push(normalizedNewHeading);
+            if (headingHistory.length > MAX_HEADING_HISTORY) {
+                headingHistory.shift();
+            }
+
+            // Only proceed if we have enough history
+            if (headingHistory.length < 3) return;
+
+            // Calculate average heading from history to smooth out noise
+            const avgHeading = calculateAverageHeading(headingHistory);
+            const normalizedCurrentHeading = ((currentHeading % 360) + 360) % 360;
+
+            // Calculate the shortest angular difference
+            let headingDiff = avgHeading - normalizedCurrentHeading;
+            if (headingDiff > 180) headingDiff -= 360;
+            if (headingDiff < -180) headingDiff += 360;
+
+            // Much stricter criteria for heading updates
+            if (Math.abs(headingDiff) > 30 && Math.abs(headingDiff) < 120 && distance > 30) {
+                const oldHeading = currentHeading;
+                currentHeading = avgHeading;
+                lastValidHeading = avgHeading;
+
+                // Rotate map with extra stability checks
+                rotateMapToHeadingStable(currentHeading);
+
+                console.log('Updated heading from', Math.round(oldHeading), 'to', Math.round(currentHeading), 'degrees, moved', Math.round(distance), 'meters, diff:', Math.round(headingDiff));
+            }
+        }
+
+        function calculateAverageHeading(headings) {
+            // Convert to unit vectors, average, then back to angle
+            let x = 0, y = 0;
+            for (const heading of headings) {
+                const rad = heading * Math.PI / 180;
+                x += Math.cos(rad);
+                y += Math.sin(rad);
+            }
+            x /= headings.length;
+            y /= headings.length;
+
+            let avgHeading = Math.atan2(y, x) * 180 / Math.PI;
+            return ((avgHeading % 360) + 360) % 360;
+        }
+
+        function enableHeadingUpdates() {
+            headingUpdatesEnabled = true;
+            console.log('Heading updates enabled');
+        }
+
+        function disableHeadingUpdates() {
+            headingUpdatesEnabled = false;
+            headingHistory = [];
+            console.log('Heading updates disabled');
+        }
+
+        function toggleHeadingUpdates() {
+            const btn = document.getElementById('heading-toggle-btn');
+            const text = document.getElementById('heading-toggle-text');
+
+            if (headingUpdatesEnabled) {
+                disableHeadingUpdates();
+                btn.className = 'flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-white transition-colors';
+                btn.innerHTML = '<i class="fas fa-ban mr-2"></i><span id="heading-toggle-text">Enable Rotation</span>';
+                showNotification('Map rotation disabled', 'info');
+            } else {
+                enableHeadingUpdates();
+                btn.className = 'flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white transition-colors';
+                btn.innerHTML = '<i class="fas fa-compass mr-2"></i><span id="heading-toggle-text">Disable Rotation</span>';
+                showNotification('Map rotation enabled', 'info');
+            }
+        }
+
+        function calculateDistanceInMeters(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c; // Distance in meters
+        }
+
+        function calculateBearing(lat1, lng1, lat2, lng2) {
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const lat1Rad = lat1 * Math.PI / 180;
+            const lat2Rad = lat2 * Math.PI / 180;
+
+            const y = Math.sin(dLng) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+                      Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            return (bearing + 360) % 360; // Normalize to 0-360
+        }
+
+        function rotateMapToHeading(heading) {
+            rotateMapToHeadingStable(heading);
+        }
+
+        function rotateMapToHeadingStable(heading) {
+            if (!navMap || !currentLocation || !headingUpdatesEnabled) return;
+
+            try {
+                // Normalize heading to prevent extreme rotations
+                const normalizedHeading = ((heading % 360) + 360) % 360;
+
+                // Extra safety check - don't rotate if heading is too different from last valid heading
+                if (lastValidHeading !== 0) {
+                    let headingDiff = normalizedHeading - lastValidHeading;
+                    if (headingDiff > 180) headingDiff -= 360;
+                    if (headingDiff < -180) headingDiff += 360;
+
+                    if (Math.abs(headingDiff) > 90) {
+                        console.warn('Heading change too large, ignoring:', headingDiff);
+                        return;
+                    }
+                }
+
+                // Ensure map is centered on current location before rotation
+                const currentCenter = navMap.getCenter();
+                const targetCenter = [currentLocation.lat, currentLocation.lng];
+
+                // Only recenter if we've drifted significantly (more than ~10 meters)
+                const centerDistance = calculateDistanceInMeters(
+                    currentCenter.lat, currentCenter.lng,
+                    targetCenter[0], targetCenter[1]
+                );
+
+                if (centerDistance > 10) {
+                    navMap.setView(targetCenter, 18, { animate: false });
+                }
+
+                // Get the map container
+                const mapContainer = navMap.getContainer();
+                const mapPane = mapContainer.querySelector('.leaflet-map-pane');
+
+                if (mapPane) {
+                    // Check current rotation to prevent accumulation
+                    const currentTransform = mapPane.style.transform;
+                    let currentRotation = 0;
+                    if (currentTransform && currentTransform.includes('rotate')) {
+                        const match = currentTransform.match(/rotate\(([^)]+)deg\)/);
+                        if (match) {
+                            currentRotation = parseFloat(match[1]);
+                        }
+                    }
+
+                    const rotation = -normalizedHeading; // Negative because we want heading-up
+
+                    // Prevent extreme rotations that could break the map
+                    if (Math.abs(rotation) > 360 || Math.abs(currentRotation) > 360) {
+                        console.warn('Extreme rotation detected, resetting map orientation');
+                        resetMapOrientation();
+                        return;
+                    }
+
+                    // Only apply rotation if it's significantly different
+                    const rotationDiff = Math.abs(rotation - currentRotation);
+                    if (rotationDiff > 5) { // Only rotate if difference is more than 5 degrees
+                        // Apply CSS transform to rotate the map
+                        mapPane.style.transform = `rotate(${rotation}deg)`;
+                        mapPane.style.transformOrigin = 'center center';
+
+                        // Smooth transition for rotation
+                        mapPane.style.transition = 'transform 1.0s ease-out';
+                    }
+                }
+
+                // Update compass indicator
+                const compassIcon = document.getElementById('compass-icon');
+                if (compassIcon) {
+                    compassIcon.style.transform = `rotate(${normalizedHeading}deg)`;
+                }
+
+                // Update user marker arrow rotation
+                updateUserMarkerRotation(normalizedHeading);
+            } catch (error) {
+                console.error('Error rotating map:', error);
+                // Reset map orientation on error
+                resetMapOrientation();
+            }
+        }
+
+        function updateUserMarkerRotation(heading) {
+            // Update all user markers to point in the direction of travel
+            const userMarkers = document.querySelectorAll('.user-marker-arrow');
+            userMarkers.forEach(marker => {
+                const arrowDiv = marker.querySelector('div');
+                if (arrowDiv) {
+                    // The arrow should point in the direction of travel relative to the rotated map
+                    const arrowRotation = heading + heading; // Double rotation to counteract map rotation and point forward
+                    arrowDiv.style.transform = `rotate(${arrowRotation}deg)`;
+                }
+            });
+        }
+
+        function resetMapOrientation() {
+            try {
+                console.log('Resetting map orientation');
+
+                // Show visual feedback
+                showNotification('Map orientation reset', 'info');
+
+                // Reset map rotation
+                const mapContainer = navMap.getContainer();
+                const mapPane = mapContainer.querySelector('.leaflet-map-pane');
+
+                if (mapPane) {
+                    mapPane.style.transform = 'rotate(0deg)';
+                    mapPane.style.transition = 'transform 0.5s ease-out';
+                }
+
+                // Reset compass
+                const compassIcon = document.getElementById('compass-icon');
+                if (compassIcon) {
+                    compassIcon.style.transform = 'rotate(0deg)';
+                }
+
+                // Reset heading tracking
+                currentHeading = 0;
+
+                // Recenter map on current location
+                if (currentLocation) {
+                    navMap.setView([currentLocation.lat, currentLocation.lng], 18, { animate: true });
+                }
+
+                console.log('Map orientation reset successfully');
+            } catch (error) {
+                console.error('Error resetting map orientation:', error);
+            }
+        }
+
+        function stopHeadingUpdates() {
+            if (headingUpdateInterval) {
+                clearInterval(headingUpdateInterval);
+                headingUpdateInterval = null;
+            }
+        }
+
+        function startLiveNavigationUpdates() {
+            // Stop any existing navigation updates
+            stopLiveNavigationUpdates();
+
+            console.log('Starting live navigation updates');
+
+            // Update navigation every 1 second for smooth countdown
+            navigationUpdateInterval = setInterval(() => {
+                if (isNavActive && currentLocation && currentRoute) {
+                    updateLiveNavigation();
+                }
+            }, 1000);
+        }
+
+        function stopLiveNavigationUpdates() {
+            if (navigationUpdateInterval) {
+                clearInterval(navigationUpdateInterval);
+                navigationUpdateInterval = null;
+                console.log('Stopped live navigation updates');
+            }
+        }
+
+
+
+        // Live navigation variables
+        let currentRoute = null;
+        let currentInstructionIndex = 0;
+        let lastNavigationUpdate = 0;
+        let navigationUpdateInterval = null;
+
+        // Update navigation when location changes
+        function updateNavigationLocation() {
+            if (isNavActive && currentLocation) {
+                console.log('Updating navigation location');
+
+                // Keep map centered on current location with smooth following
+                if (navMap) {
+                    // Smooth pan to new location while maintaining zoom and rotation
+                    navMap.setView([currentLocation.lat, currentLocation.lng], 18, {
+                        animate: true,
+                        duration: 0.5, // Faster animation for smoother following
+                        easeLinearity: 0.1 // Smooth easing
+                    });
+                }
+
+                // Update live navigation instructions
+                updateLiveNavigation();
+
+                // Update user marker position if using routing control
+                if (routingControl) {
+                    // Only recalculate if driver has drifted very far from route (100m+) and hasn't moved for a while
+                    const distanceFromRoute = calculateDistanceToRoute();
+
+                    // Much more conservative recalculation - only if really off route
+                    if (distanceFromRoute > 100) {
+                        // Check if we've been off route for a while to avoid false positives
+                        if (!window.offRouteStartTime) {
+                            window.offRouteStartTime = Date.now();
+                            console.log('Driver appears to be off route, monitoring...');
+                        } else if (Date.now() - window.offRouteStartTime > 30000) { // 30 seconds off route
+                            console.log('Driver has been off route for 30+ seconds, recalculating...');
+                            updateInstructionUI('🔄', 'Recalculating route...', 'Getting back on track');
+                            const waypoints = routingControl.getWaypoints();
+                            if (waypoints.length > 0) {
+                                waypoints[0].latLng = L.latLng(currentLocation.lat, currentLocation.lng);
+                                routingControl.setWaypoints(waypoints);
+                            }
+                            window.offRouteStartTime = null; // Reset timer
+                        }
+                    } else {
+                        // Back on route, reset timer
+                        window.offRouteStartTime = null;
+                    }
+                } else {
+                    // If using simple routing, update markers
+                    updateSimpleRouteMarkers();
+                }
+            }
+        }
+
+        function updateLiveNavigation() {
+            if (!currentRoute || !currentInstructions || !currentLocation) {
+                console.warn('Missing data for live navigation:', {
+                    hasRoute: !!currentRoute,
+                    hasInstructions: !!currentInstructions,
+                    hasLocation: !!currentLocation
+                });
+                return;
+            }
+
+            // Throttle updates to every 1 second for smooth countdown
+            const now = Date.now();
+            if (now - lastNavigationUpdate < 1000) return;
+            lastNavigationUpdate = now;
+
+            // Find the next meaningful instruction (turn, exit, etc.)
+            const nextManeuverIndex = findNextManeuver();
+
+            if (nextManeuverIndex !== currentInstructionIndex) {
+                currentInstructionIndex = nextManeuverIndex;
+                console.log('Updated to next maneuver instruction:', currentInstructionIndex);
+            }
+
+            // Update with distance to the NEXT maneuver
+            updateDistanceToNextManeuver();
+        }
+
+        function findNextManeuver() {
+            if (!currentInstructions || currentInstructions.length === 0) return 0;
+
+            // Start from current position and look for the next meaningful maneuver
+            for (let i = currentInstructionIndex; i < currentInstructions.length; i++) {
+                const instruction = currentInstructions[i];
+                if (!instruction) continue;
+
+                // Check if this is a meaningful maneuver (not just "continue straight")
+                if (isMeaningfulManeuver(instruction)) {
+                    // Check if we're close enough to this maneuver to show it
+                    const instructionCoord = getInstructionCoordinate(instruction);
+                    if (instructionCoord) {
+                        const distance = calculateDistanceInMeters(
+                            currentLocation.lat, currentLocation.lng,
+                            instructionCoord.lat, instructionCoord.lng
+                        );
+
+                        // Show maneuvers that are within reasonable distance (up to 2km)
+                        if (distance <= 2000) {
+                            return i;
+                        }
+                    }
+                }
+            }
+
+            // If no meaningful maneuver found, return the last instruction (destination)
+            return currentInstructions.length - 1;
+        }
+
+        function isMeaningfulManeuver(instruction) {
+            if (!instruction.type && !instruction.text) return false;
+
+            const type = instruction.type || '';
+            const text = (instruction.text || '').toLowerCase();
+
+            // Types that are meaningful maneuvers
+            const meaningfulTypes = [
+                'turn-left', 'turn-right', 'turn-sharp-left', 'turn-sharp-right',
+                'turn-slight-left', 'turn-slight-right', 'uturn',
+                'fork-left', 'fork-right', 'merge', 'ramp-left', 'ramp-right',
+                'roundabout-left', 'roundabout-right', 'exit-left', 'exit-right'
+            ];
+
+            // Text patterns that indicate meaningful maneuvers
+            const meaningfulPatterns = [
+                'turn', 'left', 'right', 'exit', 'roundabout', 'merge',
+                'fork', 'ramp', 'continue onto', 'take the', 'destination'
+            ];
+
+            // Check type
+            if (meaningfulTypes.includes(type)) {
+                return true;
+            }
+
+            // Check text patterns
+            for (const pattern of meaningfulPatterns) {
+                if (text.includes(pattern)) {
+                    return true;
+                }
+            }
+
+            // Skip generic "continue" or "head" instructions unless they're the only option
+            if (text.includes('continue') && !text.includes('onto') && !text.includes('for')) {
+                return false;
+            }
+            if (text.includes('head') && !text.includes('toward')) {
+                return false;
+            }
+
+            return false;
+        }
+
+        function updateDistanceToNextManeuver() {
+            if (!currentInstructions || currentInstructionIndex >= currentInstructions.length) {
+                console.warn('No instructions available or index out of bounds');
+                return;
+            }
+
+            const nextManeuver = currentInstructions[currentInstructionIndex];
+            if (!nextManeuver) {
+                console.warn('Next maneuver instruction is null/undefined');
+                return;
+            }
+
+            // Calculate distance along the route to the next maneuver
+            const distanceToManeuver = calculateRouteDistanceToInstruction(currentInstructionIndex);
+
+            if (distanceToManeuver === null) {
+                console.warn('Could not calculate route distance, using fallback display');
+                const icon = getInstructionIcon(nextManeuver.type);
+                const text = nextManeuver.text || 'Continue straight';
+                updateInstructionUI(icon, 'Calculating...', text);
+                return;
+            }
+
+            // Validate distance calculation
+            if (isNaN(distanceToManeuver) || distanceToManeuver < 0) {
+                console.error('Invalid distance calculated:', distanceToManeuver);
+                const icon = getInstructionIcon(nextManeuver.type);
+                const text = nextManeuver.text || 'Continue straight';
+                updateInstructionUI(icon, 'Distance Error', text);
+                return;
+            }
+
+            // Convert to yards/feet for better granularity like Google Maps
+            const distanceYards = Math.round(distanceToManeuver * 1.094);
+            const distanceFeet = Math.round(distanceToManeuver * 3.281);
+
+            // Format distance appropriately with Google Maps-style increments
+            let formattedDistance;
+            if (distanceYards > 500) {
+                formattedDistance = `${Math.round(distanceYards / 100) * 100} yds`;
+            } else if (distanceYards > 300) {
+                formattedDistance = `${Math.round(distanceYards / 50) * 50} yds`;
+            } else if (distanceYards > 100) {
+                formattedDistance = `${Math.round(distanceYards / 25) * 25} yds`;
+            } else if (distanceYards > 50) {
+                formattedDistance = `${Math.round(distanceYards / 10) * 10} yds`;
+            } else if (distanceYards > 20) {
+                formattedDistance = `${Math.round(distanceYards / 5) * 5} yds`;
+            } else if (distanceFeet > 100) {
+                formattedDistance = `${Math.round(distanceFeet / 25) * 25} ft`;
+            } else if (distanceFeet > 50) {
+                formattedDistance = `${Math.round(distanceFeet / 10) * 10} ft`;
+            } else {
+                formattedDistance = `${Math.round(distanceFeet / 5) * 5} ft`;
+            }
+
+            // Get instruction details and format properly for GPS-style navigation
+            const icon = getInstructionIcon(nextManeuver.type);
+            let text = nextManeuver.text || 'Continue straight';
+
+            // Format text to be more GPS-like: "In 200 yds, turn right"
+            text = formatNavigationText(text, formattedDistance);
+
+            // Update UI with live distance to next maneuver
+            updateInstructionUI(icon, formattedDistance, text);
+
+            console.log(`Distance to next maneuver ${currentInstructionIndex}: ${formattedDistance} (${distanceToManeuver.toFixed(1)}m) - ${text}`);
+
+            // Check if we've passed this maneuver (within 10 meters) and advance
+            if (distanceToManeuver < 10 && currentInstructionIndex < currentInstructions.length - 1) {
+                console.log('Passed maneuver, looking for next one');
+                // Find the next maneuver
+                const nextIndex = findNextManeuver();
+                if (nextIndex > currentInstructionIndex) {
+                    currentInstructionIndex = nextIndex;
+                    setTimeout(() => updateDistanceToNextManeuver(), 500);
+                }
+            }
+        }
+
+        function getInstructionCoordinate(instruction) {
+            if (!currentRoute || !instruction) {
+                console.warn('Missing route or instruction data');
+                return null;
+            }
+
+            // Debug logging
+            console.log('Getting coordinate for instruction:', instruction);
+            console.log('Current route structure:', currentRoute);
+
+            // Method 1: Try to get coordinate from instruction index
+            if (instruction.index !== undefined && currentRoute.coordinates) {
+                const coord = currentRoute.coordinates[instruction.index];
+                if (coord && Array.isArray(coord) && coord.length >= 2) {
+                    console.log('Found coordinate from route.coordinates[index]:', coord);
+                    return { lat: coord[1], lng: coord[0] }; // GeoJSON format is [lng, lat]
+                }
+            }
+
+            // Method 2: Try to get from instruction object itself
+            if (instruction.latLng) {
+                console.log('Found coordinate from instruction.latLng:', instruction.latLng);
+                return { lat: instruction.latLng.lat, lng: instruction.latLng.lng };
+            }
+
+            // Method 3: Try alternative coordinate properties
+            if (instruction.coordinate) {
+                console.log('Found coordinate from instruction.coordinate:', instruction.coordinate);
+                return { lat: instruction.coordinate[1], lng: instruction.coordinate[0] };
+            }
+
+            // Method 4: Try waypoint property
+            if (instruction.waypoint) {
+                console.log('Found coordinate from instruction.waypoint:', instruction.waypoint);
+                return { lat: instruction.waypoint.lat, lng: instruction.waypoint.lng };
+            }
+
+            // Method 5: Try to extract from route waypoints
+            if (currentRoute.waypoints && currentRoute.waypoints.length > currentInstructionIndex) {
+                const waypoint = currentRoute.waypoints[currentInstructionIndex];
+                if (waypoint && waypoint.latLng) {
+                    console.log('Found coordinate from route waypoints:', waypoint.latLng);
+                    return { lat: waypoint.latLng.lat, lng: waypoint.latLng.lng };
+                }
+            }
+
+            console.warn('Could not find coordinate for instruction:', instruction);
+            return null;
+        }
+
+        function calculateDistanceToRoute() {
+            if (!currentRoute || !currentRoute.coordinates || !currentLocation) return Infinity;
+
+            let minDistance = Infinity;
+
+            // Check distance to several points along the route
+            for (let i = 0; i < currentRoute.coordinates.length; i += 5) { // Sample every 5th point for performance
+                const coord = currentRoute.coordinates[i];
+                const distance = calculateDistanceInMeters(
+                    currentLocation.lat, currentLocation.lng,
+                    coord[1], coord[0] // GeoJSON format is [lng, lat]
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                }
+            }
+
+            return minDistance;
+        }
+
+        function updateSimpleRouteMarkers() {
+            if (!navMap || !currentLocation) return;
+
+            // Find and update user marker position
+            navMap.eachLayer(function(layer) {
+                if (layer.options && layer.options.icon &&
+                    layer.options.icon.options.className === 'user-marker-arrow') {
+                    layer.setLatLng([currentLocation.lat, currentLocation.lng]);
+                }
+            });
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 3959; // Earth's radius in miles
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+
+
+        // Route Check-in Functions
+        function checkInRoute() {
+            if (isCheckedIn) return;
+
+            const now = new Date();
+            routeStartTime = now;
+            isCheckedIn = true;
+
+            // Update UI
+            document.getElementById('checkin-section').style.display = 'none';
+            document.getElementById('timer-section').style.display = 'block';
+            document.getElementById('start-time').textContent = now.toLocaleTimeString();
+
+            // Start timer
+            startRouteTimer();
+
+            // Send check-in to server
+            fetch(`/route/${routeId}/checkin`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    checkin_time: now.toISOString()
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Route checked in successfully!', 'success');
+                } else {
+                    console.error('Failed to check in route');
+                }
+            })
+            .catch(error => {
+                console.error('Error checking in route:', error);
+            });
+        }
+
+        function checkExistingCheckin() {
+            // Check if route is already checked in
+            fetch(`/route/${routeId}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.checkin_time) {
+                        routeStartTime = new Date(data.checkin_time);
+                        isCheckedIn = true;
+
+                        // Update UI
+                        document.getElementById('checkin-section').style.display = 'none';
+                        document.getElementById('timer-section').style.display = 'block';
+                        document.getElementById('start-time').textContent = routeStartTime.toLocaleTimeString();
+
+                        // Start timer
+                        startRouteTimer();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking route status:', error);
+                });
+        }
+
+        function startRouteTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            timerInterval = setInterval(() => {
+                if (routeStartTime) {
+                    const now = new Date();
+                    const elapsed = now - routeStartTime;
+                    const hours = Math.floor(elapsed / (1000 * 60 * 60));
+                    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
+
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    document.getElementById('elapsed-time').textContent = timeString;
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            // This function is now replaced by automatic checkout logic
+            performRouteCheckout();
+        }
+
+        function performRouteCheckout() {
+            console.log('Performing route checkout...');
+
+            // Check if driver is at depot
+            const depotItem = document.querySelector('[data-is-depot="true"]');
+            const depotAddress = depotItem ? depotItem.getAttribute('data-address') : null;
+
+            if (depotAddress && currentLocation) {
+                checkDepotProximityAndCheckout(depotAddress);
+            } else {
+                // Manual checkout
+                manualRouteCheckout();
+            }
+        }
+
+        async function checkDepotProximityAndCheckout(depotAddress) {
+            try {
+                // Use improved geocoding for depot address
+                const data = await tryMultipleGeocodingStrategies(depotAddress);
+
+                if (data && data.length > 0) {
+                    const depotLat = parseFloat(data[0].lat);
+                    const depotLng = parseFloat(data[0].lon);
+
+                    // Calculate distance to depot
+                    const distanceToDepot = calculateDistanceInMeters(
+                        currentLocation.lat, currentLocation.lng,
+                        depotLat, depotLng
+                    );
+
+                    console.log('Distance to depot:', distanceToDepot, 'meters');
+
+                    if (distanceToDepot <= 100) {
+                        // Within 100m of depot - automatic checkout
+                        automaticRouteCheckout();
+                    } else {
+                        // Not at depot - manual checkout
+                        manualRouteCheckout();
+                    }
+                } else {
+                    console.error('Could not geocode depot address');
+                    manualRouteCheckout();
+                }
+            } catch (error) {
+                console.error('Error checking depot proximity:', error);
+                manualRouteCheckout();
+            }
+        }
+
+        function automaticRouteCheckout() {
+            console.log('Performing automatic checkout - driver is at depot');
+
+            const now = new Date();
+            const allDeliveries = document.querySelectorAll('.delivery-item:not([data-is-depot])');
+            const completedDeliveries = document.querySelectorAll('.delivery-item.completed:not([data-is-depot])');
+            const failedDeliveries = document.querySelectorAll('.delivery-item.failed:not([data-is-depot])');
+
+            let checkInTime;
+
+            if (!isCheckedIn) {
+                // No manual check-in was used - calculate estimated check-in time
+                if (completedDeliveries.length === allDeliveries.length) {
+                    // All deliveries completed - calculate check-in time
+                    checkInTime = calculateEstimatedCheckInTime(now);
+                    console.log('Calculated estimated check-in time:', checkInTime);
+                } else {
+                    // Some deliveries failed - prompt for manual check-in
+                    promptForManualCheckIn(now);
+                    return;
+                }
+            } else {
+                // Use existing check-in time
+                checkInTime = routeStartTime;
+            }
+
+            // Perform checkout
+            completeRouteCheckout(checkInTime, now);
+        }
+
+        function calculateEstimatedCheckInTime(checkoutTime) {
+            // Estimate total route time based on completed deliveries and travel
+            const totalStops = document.querySelectorAll('.delivery-item:not([data-is-depot])').length;
+            const estimatedMinutesPerStop = 15; // Average time per delivery
+            const estimatedTravelTime = totalStops * 10; // Average travel time between stops
+            const totalEstimatedMinutes = (totalStops * estimatedMinutesPerStop) + estimatedTravelTime;
+
+            // Add 10% variance
+            const varianceMinutes = totalEstimatedMinutes * 0.1;
+            const finalEstimatedMinutes = totalEstimatedMinutes + (Math.random() * varianceMinutes * 2 - varianceMinutes);
+
+            // Calculate check-in time
+            const estimatedCheckInTime = new Date(checkoutTime.getTime() - (finalEstimatedMinutes * 60000));
+
+            console.log('Estimated route duration:', Math.round(finalEstimatedMinutes), 'minutes');
+            return estimatedCheckInTime;
+        }
+
+        function promptForManualCheckIn(checkoutTime) {
+            const failedCount = document.querySelectorAll('.delivery-item.failed:not([data-is-depot])').length;
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+                    <h3 class="text-xl font-bold text-white mb-4">Manual Check-in Required</h3>
+                    <p class="text-gray-300 mb-4">
+                        You have ${failedCount} failed deliveries. Please enter your actual check-in time:
+                    </p>
+                    <input type="datetime-local" id="manual-checkin-time"
+                           class="w-full p-2 rounded bg-gray-700 text-white mb-4"
+                           value="${new Date(checkoutTime.getTime() - 4*60*60*1000).toISOString().slice(0, 16)}">
+                    <div class="flex gap-2">
+                        <button onclick="confirmManualCheckIn('${checkoutTime.toISOString()}')"
+                                class="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white">
+                            Confirm Check-out
+                        </button>
+                        <button onclick="this.closest('.fixed').remove()"
+                                class="flex-1 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded text-white">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function confirmManualCheckIn(checkoutTimeStr) {
+            const checkInInput = document.getElementById('manual-checkin-time');
+            const checkInTime = new Date(checkInInput.value);
+            const checkoutTime = new Date(checkoutTimeStr);
+
+            // Remove modal
+            document.querySelector('.fixed.inset-0').remove();
+
+            // Complete checkout
+            completeRouteCheckout(checkInTime, checkoutTime);
+        }
+
+        function manualRouteCheckout() {
+            if (confirm('Are you sure you want to complete the route? This will end your route tracking.')) {
+                const now = new Date();
+                const checkInTime = isCheckedIn ? routeStartTime : calculateEstimatedCheckInTime(now);
+                completeRouteCheckout(checkInTime, now);
+            }
+        }
+
+        function completeRouteCheckout(checkInTime, checkoutTime) {
+            console.log('Completing route checkout...');
+            console.log('Check-in time:', checkInTime);
+            console.log('Checkout time:', checkoutTime);
+
+            // Stop timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            // Send checkout to server
+            fetch(`/route/${routeId}/checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    checkin_time: checkInTime.toISOString(),
+                    checkout_time: checkoutTime.toISOString(),
+                    final_location: currentLocation
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateUIForCompletedRoute(checkInTime, checkoutTime);
+                    showNotification('Route completed successfully!', 'success');
+                } else {
+                    console.error('Failed to complete route checkout');
+                    showNotification('Failed to complete route checkout', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error completing route checkout:', error);
+                showNotification('Error completing route checkout', 'error');
+            });
+        }
+
+        function updateUIForCompletedRoute(checkInTime, checkoutTime) {
+            // Update UI to show completed status
+            document.getElementById('route-status').textContent = 'Completed';
+            document.getElementById('route-status').className = 'text-lg font-semibold text-green-400';
+
+            // Update button
+            document.getElementById('stop-timer-btn').disabled = true;
+            document.getElementById('stop-timer-btn').className = 'px-4 py-2 bg-gray-600 rounded text-gray-400 cursor-not-allowed';
+            document.getElementById('stop-timer-btn').innerHTML = '<i class="fas fa-check mr-2"></i>Route Completed';
+
+            // Update times
+            document.getElementById('start-time').textContent = checkInTime.toLocaleTimeString();
+
+            // Calculate and display total time
+            const totalTime = checkoutTime - checkInTime;
+            const hours = Math.floor(totalTime / (1000 * 60 * 60));
+            const minutes = Math.floor((totalTime % (1000 * 60 * 60)) / (1000 * 60));
+            document.getElementById('elapsed-time').textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+        }
+
+
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+        });
+    </script>
+
+    <!-- Leaflet and Routing Machine -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCHBzKvpPE6lyMrBLf4EZtmWUu1wLaolgM&libraries=places,geometry"></script>
+</body>
+</html>

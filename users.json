@@ -1,0 +1,27 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "password_hash": "pbkdf2:sha256:260000$CvkUluBUfXAmyiEE$bf1ffa6fcb5d2827ab61cad11ba0058087f16b32c099aa3c5a348eb469f148c9",
+      "company_name": "EightNode",
+      "company_depot": "Don Pulentos, Unit 7 New Meadow Rd, Redditch B98 8YW, UK",
+      "privilege": "global_admin",
+      "company_id": "8350e537",
+      "last_login": "2025-06-14T11:31:30.515847"
+    },
+    {
+      "username": "jake",
+      "password_hash": "pbkdf2:sha256:260000$Q0A0DgyYT32Qbf9b$37ff4f1d8f80290e127055b2965d37cbcc2060d046ca8c1e5d889d735966ea08",
+      "company_name": "Ask Retrofit",
+      "company_depot": "Ask Retrofit-UK, Devon Way, Longbridge, Birmingham, UK",
+      "privilege": "admin"
+    },
+    {
+      "username": "Broughtons_Demo",
+      "password_hash": "pbkdf2:sha256:260000$e6r39bFOOPsxFuEn$711254664ff6ddf8cbead5be9d10a4ede4cb136fdf001724f98991f56b01e454",
+      "company_name": "Broughton Storage & Distribution Ltd",
+      "company_depot": "Broughton Storage & Distribution Ltd, Heming Road, Redditch, UK",
+      "privilege": "admin"
+    }
+  ]
+}

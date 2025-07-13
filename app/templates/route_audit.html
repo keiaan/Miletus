@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Audit - EightNode AutoScheduler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1A1A1A;
+            --bg-secondary: #2A2A2A;
+            --bg-tertiary: #333333;
+            --accent-purple: #8B5CF6;
+            --accent-purple-dark: #7C3AED;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modern-input {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .modern-input:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-purple {
+            background: linear-gradient(45deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .route-card {
+            background: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        .route-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .status-planned {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .driver-tag {
+            background-color: var(--accent-purple);
+            color: white;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+            display: inline-block;
+        }
+
+        /* Enhanced Company Selector Styles */
+        .company-selector {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .company-selector::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+        }
+
+        .company-selector-title {
+            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .company-dropdown {
+            background: var(--bg-tertiary);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 1rem 1.25rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .company-dropdown:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown:hover {
+            border-color: rgba(139, 92, 246, 0.5);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown option {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem;
+        }
+
+        /* Download dropdown styling */
+        .download-dropdown {
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .download-dropdown a:hover {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.2));
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body class="min-h-screen">
+    {% set current_page = 'route_audit' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-white">Route Audit</h1>
+                    {% if not is_global_admin %}
+                        <p class="text-gray-400 mt-1">{{ company_name }}</p>
+                    {% endif %}
+                </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-purple-900/50 border-l-4 border-purple-500 p-4 mb-6 rounded-r-md fade-in">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-purple-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-purple-100">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if is_global_admin %}
+        <!-- Company Selection for Global Admin -->
+        <div class="company-selector mb-6">
+            <h2 class="company-selector-title">
+                <i class="fas fa-building"></i>
+                Company Selection
+            </h2>
+            <form action="{{ url_for('route_audit') }}" method="GET">
+                <select name="company"
+                        class="company-dropdown"
+                        onchange="this.form.submit()">
+                    <option value="">🏢 Select a Company</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}"
+                                {% if company_name == company %}selected{% endif %}>
+                            {{ company }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if (is_global_admin and company_name) or not is_global_admin %}
+        <!-- Filters -->
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Filters</h2>
+                <a href="{{ url_for('route_audit', company=company_name if is_global_admin else '') }}"
+                   class="text-purple-400 hover:text-purple-300 text-sm">
+                    <i class="fas fa-times mr-1"></i>Clear Filters
+                </a>
+            </div>
+            <form action="{{ url_for('route_audit') }}" method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% if is_global_admin %}
+                    <input type="hidden" name="company" value="{{ company_name }}">
+                {% endif %}
+                
+                <div>
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Date</label>
+                    <input type="date" name="date_filter" value="{{ date_filter or '' }}"
+                           class="modern-input w-full rounded-md px-4 py-2">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Driver</label>
+                    <select name="driver_filter" class="modern-input w-full rounded-md px-4 py-2">
+                        <option value="">All Drivers</option>
+                        {% for driver in all_drivers %}
+                            <option value="{{ driver }}" {% if driver_filter == driver %}selected{% endif %}>
+                                {{ driver }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="flex items-end">
+                    <button type="submit" class="btn-purple w-full text-white font-medium py-2 px-4 rounded-md">
+                        <i class="fas fa-filter mr-2"></i>Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Route History -->
+        <div class="card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-xl font-semibold text-purple-400">Route History</h2>
+                    <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200 mt-2 inline-block">
+                        {{ route_history|length }} Routes
+                    </span>
+                </div>
+
+                <!-- Download Options -->
+                <div class="flex items-center space-x-3">
+                    <div class="relative">
+                        <button id="downloadBtn"
+                                class="download-btn px-4 py-2 rounded-md text-white font-medium flex items-center space-x-2">
+                            <i class="fas fa-download"></i>
+                            <span>Download</span>
+                            <i class="fas fa-chevron-down ml-1"></i>
+                        </button>
+
+                        <!-- Download Dropdown -->
+                        <div id="downloadDropdown"
+                             class="download-dropdown hidden absolute right-0 mt-2 w-48 bg-[#2A2A2A] rounded-lg shadow-lg z-10">
+                            <div class="py-2">
+                                <a href="{{ url_for('download_route_audit', format='csv', company=company_name if is_global_admin else '', date_filter=date_filter or '', driver_filter=driver_filter or '') }}"
+                                   class="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-[#333333] hover:text-white transition-colors duration-200">
+                                    <i class="fas fa-file-csv mr-3 text-green-400"></i>
+                                    Download as CSV
+                                </a>
+                                <a href="{{ url_for('download_route_audit', format='json', company=company_name if is_global_admin else '', date_filter=date_filter or '', driver_filter=driver_filter or '') }}"
+                                   class="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-[#333333] hover:text-white transition-colors duration-200">
+                                    <i class="fas fa-file-code mr-3 text-blue-400"></i>
+                                    Download as JSON
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if route_history %}
+                <div class="space-y-4">
+                    {% for route_entry in route_history %}
+                    <div class="route-card rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-grow">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h3 class="font-semibold text-lg text-white">
+                                        Route #{{ route_entry.id[:8] }}
+                                    </h3>
+                                    <span class="status-badge status-completed">
+                                        <i class="fas fa-check-circle mr-1"></i>Completed
+                                    </span>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                                    <div>
+                                        <p class="text-gray-400 text-sm">Date & Time</p>
+                                        <p class="text-white">
+                                            {{ route_entry.timestamp[:19].replace('T', ' ') }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-400 text-sm">Drivers Used</p>
+                                        <p class="text-white">
+                                            {{ route_entry.data.num_drivers_used or 'N/A' }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-400 text-sm">Addresses Served</p>
+                                        <p class="text-white">
+                                            {{ route_entry.data.total_addresses_served or 'N/A' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <p class="text-gray-400 text-sm mb-2">Drivers</p>
+                                    <div class="flex flex-wrap">
+                                        {% for result in route_entry.data.results %}
+                                            <span class="driver-tag">{{ result.driver }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <!-- Delivery Status -->
+                                {% if route_entry.delivery_status and route_entry.delivery_status.deliveries %}
+                                {% set completed = route_entry.delivery_status.deliveries.values() | selectattr('status', 'equalto', 'completed') | list | length %}
+                                {% set failed = route_entry.delivery_status.deliveries.values() | selectattr('status', 'equalto', 'failed') | list | length %}
+                                {% set total_deliveries = route_entry.delivery_status.deliveries | length %}
+                                <div class="mb-3">
+                                    <p class="text-gray-400 text-sm mb-2">Delivery Status</p>
+                                    <div class="flex items-center space-x-4 text-sm">
+                                        <span class="text-green-400">
+                                            <i class="fas fa-check-circle mr-1"></i>{{ completed }} completed
+                                        </span>
+                                        {% if failed > 0 %}
+                                        <span class="text-red-400">
+                                            <i class="fas fa-times-circle mr-1"></i>{{ failed }} failed
+                                        </span>
+                                        {% endif %}
+                                        <span class="text-orange-400">
+                                            <i class="fas fa-clock mr-1"></i>{{ total_deliveries - completed - failed }} pending
+                                        </span>
+                                        {% if route_entry.route_id %}
+                                        <a href="/route/{{ route_entry.route_id }}" target="_blank"
+                                           class="text-purple-400 hover:text-purple-300 transition-colors duration-300">
+                                            <i class="fas fa-external-link-alt mr-1"></i>Live Tracking
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="ml-4 flex space-x-2">
+                                <a href="{{ url_for('route_audit_detail', route_id=route_entry.id, company=company_name if is_global_admin else '') }}"
+                                   class="text-purple-400 hover:text-purple-300 transition-colors duration-300">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        {% if route_entry.data.missed_addresses %}
+                        <div class="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+                            <p class="text-red-400 text-sm">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                {{ route_entry.data.missed_addresses|length }} addresses could not be served
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-8 text-gray-400">
+                    <i class="fas fa-route text-4xl mb-4"></i>
+                    <p>No route history found</p>
+                    {% if date_filter or driver_filter %}
+                        <p class="text-sm mt-2">Try adjusting your filters</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Download dropdown functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            const downloadDropdown = document.getElementById('downloadDropdown');
+
+            if (downloadBtn && downloadDropdown) {
+                downloadBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    downloadDropdown.classList.toggle('hidden');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!downloadBtn.contains(e.target) && !downloadDropdown.contains(e.target)) {
+                        downloadDropdown.classList.add('hidden');
+                    }
+                });
+
+                // Close dropdown when clicking on download links
+                downloadDropdown.addEventListener('click', function() {
+                    setTimeout(() => {
+                        downloadDropdown.classList.add('hidden');
+                    }, 100);
+                });
+            }
+
+        });
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>

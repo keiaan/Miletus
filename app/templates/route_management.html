@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Management - EightNode AutoScheduler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1A1A1A;
+            --bg-secondary: #2A2A2A;
+            --bg-tertiary: #333333;
+            --accent-purple: #8B5CF6;
+            --accent-purple-dark: #7C3AED;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: #FFFFFF;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modern-input {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #FFFFFF;
+            transition: all 0.3s ease;
+        }
+
+        .modern-input:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-purple {
+            background: linear-gradient(45deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        /* Enhanced Company Selector Styles */
+        .company-selector {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .company-selector::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+        }
+
+        .company-selector-title {
+            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .company-dropdown {
+            background: var(--bg-tertiary);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 1rem 1.25rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .company-dropdown:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown:hover {
+            border-color: rgba(139, 92, 246, 0.5);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown option {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem;
+        }
+
+        .setting-card {
+            background: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--accent-purple);
+            pointer-events: none;
+        }
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body class="min-h-screen">
+    {% set current_page = 'route_management' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-white">Route Management</h1>
+                    {% if not is_global_admin %}
+                        <p class="text-gray-400 mt-1">{{ company_name }}</p>
+                    {% endif %}
+                </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-purple-900/50 border-l-4 border-purple-500 p-4 mb-6 rounded-r-md fade-in">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-purple-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-purple-100">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if is_global_admin %}
+        <!-- Company Selection for Global Admin -->
+        <div class="company-selector mb-6">
+            <h2 class="company-selector-title">
+                <i class="fas fa-building"></i>
+                Company Selection
+            </h2>
+            <form action="{{ url_for('route_management') }}" method="GET">
+                <select name="selected_company"
+                        class="company-dropdown"
+                        onchange="this.form.submit()">
+                    <option value="">🏢 Select a Company</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}"
+                                {% if selected_company == company %}selected{% endif %}>
+                            {{ company }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if (is_global_admin and selected_company) or not is_global_admin %}
+        <!-- Route Settings Card -->
+        <div class="card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Route Settings</h2>
+                <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200">
+                    {{ selected_company if is_global_admin else company_name }}
+                </span>
+            </div>
+            <form action="{{ url_for('save_route_settings') }}" method="POST">
+                {% if is_global_admin %}
+                <input type="hidden" name="company" value="{{ selected_company }}">
+                {% endif %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Maximum Miles -->
+                    <div class="input-group">
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="maxMiles">
+                            Maximum Miles per Driver
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="maxMiles" name="maxMiles" required
+                                   class="modern-input w-full rounded-md px-4 py-3 pr-10"
+                                   value="{{ route_settings.max_miles }}"
+                                   min="0" step="0.1">
+                            <span class="input-icon">
+                                <i class="fas fa-road"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Maximum Time -->
+                    <div class="input-group">
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="maxTime">
+                            Maximum Time per Driver (hours)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="maxTime" name="maxTime" required
+                                   class="modern-input w-full rounded-md px-4 py-3 pr-10"
+                                   value="{{ route_settings.max_time }}"
+                                   min="0" step="0.5">
+                            <span class="input-icon">
+                                <i class="fas fa-clock"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Maximum Stops -->
+                    <div class="input-group">
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="maxStops">
+                            Maximum Stops per Driver
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="maxStops" name="maxStops" required
+                                   class="modern-input w-full rounded-md px-4 py-3 pr-10"
+                                   value="{{ route_settings.max_stops }}"
+                                   min="1" step="1">
+                            <span class="input-icon">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Drop Penalty -->
+                    <div class="input-group">
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="dropPenalty">
+                            Drop Penalty
+                            <span class="ml-2 text-xs text-purple-400 cursor-pointer hover:text-purple-300" 
+                                  title="The drop penalty is a cost added when a delivery point cannot be assigned to any route. Higher values prioritize including all stops in routes.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="dropPenalty" name="dropPenalty" required
+                                   class="modern-input w-full rounded-md px-4 py-3 pr-10"
+                                   value="{{ route_settings.drop_penalty }}"
+                                   min="0" step="1">
+                            <span class="input-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="mt-8">
+                    <button type="submit" 
+                            class="btn-purple w-full text-white font-medium py-3 px-6 rounded-md
+                                   flex items-center justify-center space-x-2">
+                        <i class="fas fa-save mr-2"></i>
+                        Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Current Settings Summary -->
+        <div class="card rounded-xl p-6 mt-6">
+            <h2 class="text-xl font-semibold mb-4 text-purple-400">Current Settings</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="setting-card rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Maximum Miles</span>
+                        <i class="fas fa-road text-purple-400"></i>
+                    </div>
+                    <p class="text-2xl font-semibold mt-2">{{ route_settings.max_miles }}</p>
+                </div>
+
+                <div class="setting-card rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Maximum Time</span>
+                        <i class="fas fa-clock text-purple-400"></i>
+                    </div>
+                    <p class="text-2xl font-semibold mt-2">{{ route_settings.max_time }}h</p>
+                </div>
+
+                <div class="setting-card rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Maximum Stops</span>
+                        <i class="fas fa-map-marker-alt text-purple-400"></i>
+                    </div>
+                    <p class="text-2xl font-semibold mt-2">{{ route_settings.max_stops }}</p>
+                </div>
+
+                <div class="setting-card rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Drop Penalty</span>
+                        <i class="fas fa-exclamation-triangle text-purple-400"></i>
+                    </div>
+                    <p class="text-2xl font-semibold mt-2">{{ route_settings.drop_penalty }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add animation when values change
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', function() {
+                this.classList.add('bg-purple-500/10');
+                setTimeout(() => {
+                    this.classList.remove('bg-purple-500/10');
+                }, 300);
+            });
+        });
+
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>

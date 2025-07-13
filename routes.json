@@ -1,0 +1,43 @@
+{
+  "company_routes": {
+    "EightNode": {}
+  },
+  "fa821075": {
+    "route_id": "fa821075",
+    "driver_name": "Jess (1)",
+    "route": [
+      "Don Pulentos, Unit 7 New Meadow Rd, Redditch B98 8YW, UK",
+      "8 Church Green E, Redditch B98 8BP, UK",
+      "Don Pulentos, Unit 7 New Meadow Rd, Redditch B98 8YW, UK"
+    ],
+    "total_time": "0 hours, 13 minutes, 29 seconds",
+    "total_distance": "3.96 miles",
+    "num_stops": 1,
+    "google_maps": "https://tinyurl.com/27r64g5e",
+    "apple_maps": "https://tinyurl.com/27ay8f5y",
+    "created_at": "2025-06-10T23:29:58.199534",
+    "company_id": "8350e537",
+    "stop_counts": {
+      "8 Church Green E, Redditch B98 8BP, UK": 1
+    }
+  },
+  "fd788cdb": {
+    "route_id": "fd788cdb",
+    "driver_name": "Jess (1)",
+    "route": [
+      "Don Pulentos, Unit 7 New Meadow Rd, Redditch B98 8YW, UK",
+      "Unit 9 Colemeadow Rd, North, Redditch B98 9PB, UK",
+      "Don Pulentos, Unit 7 New Meadow Rd, Redditch B98 8YW, UK"
+    ],
+    "total_time": "0 hours, 15 minutes, 56 seconds",
+    "total_distance": "6.06 miles",
+    "num_stops": 1,
+    "google_maps": "https://tinyurl.com/28c7p879",
+    "apple_maps": "https://tinyurl.com/2bswevz6",
+    "created_at": "2025-06-11T18:41:50.916333",
+    "company_id": "8350e537",
+    "stop_counts": {
+      "Unit 9 Colemeadow Rd, North, Redditch B98 9PB, UK": 1
+    }
+  }
+}

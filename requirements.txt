@@ -1,0 +1,15 @@
+Flask==3.0.2
+SQLAlchemy==2.0.25
+alembic==1.13.1
+python-dotenv==1.0.1
+Werkzeug==3.0.1
+numpy==1.26.4
+pandas==2.2.0
+scikit-learn==1.4.0
+ortools==9.9.3963
+requests==2.31.0
+folium==0.15.1
+twilio==8.13.0
+urllib3==2.3.0
+polyline==2.0.2
+psycopg2-binary==2.9.9 

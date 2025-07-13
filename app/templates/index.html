@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>EightNode AutoScheduler</title>
+   <!-- External CSS -->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+   <style>
+       :root {
+           --bg-primary: #1A1A1A;
+           --bg-secondary: #2A2A2A;
+           --bg-tertiary: #333333;
+           --accent-purple: #8B5CF6;
+           --accent-purple-dark: #7C3AED;
+           --text-primary: #FFFFFF;
+           --text-secondary: #B0B0B0;
+       }
+
+       body {
+           background-color: var(--bg-primary);
+           color: var(--text-primary);
+       }
+
+       .glass-nav {
+           background: rgba(42, 42, 42, 0.8);
+           backdrop-filter: blur(8px);
+           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+       }
+
+       .card {
+           background: var(--bg-secondary);
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           transition: transform 0.3s ease, box-shadow 0.3s ease;
+       }
+
+       .card:hover {
+           transform: translateY(-2px);
+           box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+       }
+
+       .modern-input {
+           background: var(--bg-tertiary);
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           color: var(--text-primary);
+           transition: all 0.3s ease;
+       }
+
+       .modern-input:focus {
+           border-color: var(--accent-purple);
+           box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+       }
+
+       .btn-purple {
+           background: linear-gradient(45deg, var(--accent-purple), var(--accent-purple-dark));
+           transition: all 0.3s ease;
+       }
+
+       .btn-purple:hover {
+           transform: translateY(-1px);
+           box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+       }
+
+       .btn-red {
+           background: linear-gradient(45deg, #EF4444, #DC2626);
+           transition: all 0.3s ease;
+       }
+
+       .btn-red:hover {
+           transform: translateY(-1px);
+           box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+       }
+
+       @keyframes spin {
+           0% { transform: rotate(0deg); }
+           100% { transform: rotate(360deg); }
+       }
+
+       .loading-spinner {
+           animation: spin 1.2s linear infinite;
+           border: 3px solid rgba(255, 255, 255, 0.1);
+           border-top-color: var(--accent-purple);
+       }
+
+       @keyframes dots {
+           0%, 20% { content: '.'; }
+           40% { content: '..'; }
+           60% { content: '...'; }
+           80%, 100% { content: ''; }
+       }
+
+       .loading-dots::after {
+           content: '';
+           animation: dots 1.5s infinite;
+       }
+
+       @keyframes fadeInOut {
+           0%, 100% { opacity: 0; }
+           50% { opacity: 1; }
+       }
+
+       .fade-message {
+           animation: fadeInOut 4s infinite;
+       }
+
+       @keyframes fadeIn {
+           from { opacity: 0; transform: translateY(10px); }
+           to { opacity: 1; transform: translateY(0); }
+       }
+
+       .fade-in {
+           animation: fadeIn 0.5s ease forwards;
+       }
+
+       {% include 'components/mobile_navigation.css' %}
+
+       .parameter-card {
+           background: var(--bg-tertiary);
+           border-radius: 0.75rem;
+           padding: 1rem;
+           transition: all 0.3s ease;
+       }
+
+       .parameter-card:hover {
+           transform: translateY(-2px);
+           box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+       }
+
+       /* Input tabs styles */
+       .input-tab {
+           cursor: pointer;
+           border-bottom: 2px solid transparent;
+           transition: all 0.3s ease;
+           padding: 0.5rem 1rem;
+           margin-right: 1rem;
+       }
+
+       .input-tab.active {
+           border-color: var(--accent-purple);
+           color: var(--accent-purple);
+       }
+
+       /* Deletable address styles */
+       .address-item {
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           padding: 0.5rem;
+           margin-bottom: 0.25rem;
+           background: var(--bg-tertiary);
+           border-radius: 0.375rem;
+           transition: all 0.3s ease;
+       }
+
+       .address-item:hover {
+           background: var(--bg-primary);
+       }
+
+       .delete-address {
+           color: #EF4444;
+           transition: color 0.3s ease;
+       }
+
+       .delete-address:hover {
+           color: #DC2626;
+       }
+
+       /* Map styles */
+       .map-container {
+           position: relative;
+           width: 100%;
+           height: 600px;
+           border-radius: 0.5rem;
+           overflow: hidden;
+       }
+
+       .leaflet-container {
+           width: 100%;
+           height: 100%;
+       }
+
+       /* Custom marker styles */
+       .custom-div-icon {
+           background: none !important;
+           border: none !important;
+       }
+
+       .custom-marker {
+           width: 30px;
+           height: 30px;
+           border-radius: 50%;
+           background: var(--accent-purple);
+           border: 2px solid white;
+           box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           color: white;
+           font-weight: bold;
+           font-size: 14px;
+       }
+
+       .missed-marker {
+           width: 32px;
+           height: 32px;
+           border-radius: 50%;
+           background: #EF4444;
+           border: 2px solid white;
+           box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           color: white;
+           font-weight: bold;
+           font-size: 14px;
+       }
+
+       .depot-marker {
+           width: 36px;
+           height: 36px;
+           border-radius: 50%;
+           background: #4F46E5;
+           border: 2px solid white;
+           box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           color: white;
+           font-size: 16px;
+       }
+
+       .stop-icon {
+           width: 24px;
+           height: 24px;
+           border-radius: 50%;
+           background: var(--accent-purple);
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           color: white;
+           font-size: 12px;
+           flex-shrink: 0;
+       }
+
+       .stop-icon.depot {
+           background: #4F46E5;
+       }
+
+       .map-legend {
+           position: absolute;
+           bottom: 1rem;
+           left: 1rem;
+           background: rgba(26, 26, 26, 0.9);
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           padding: 0.5rem;
+           border-radius: 0.375rem;
+           z-index: 1000;
+       }
+
+       .legend-item {
+           display: flex;
+           align-items: center;
+           margin-bottom: 0.5rem;
+           font-size: 0.875rem;
+       }
+
+       .legend-color {
+           width: 1rem;
+           height: 0.25rem;
+           margin-right: 0.5rem;
+       }
+
+       .map-info-window {
+           padding: 16px;
+           background: linear-gradient(145deg, rgba(49, 46, 129, 0.95), rgba(67, 56, 202, 0.95));
+           border-radius: 12px;
+           color: white;
+           border: 1px solid rgba(139, 92, 246, 0.3);
+           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+           min-width: 220px;
+           backdrop-filter: blur(10px);
+       }
+       .map-info-window-header {
+           font-weight: bold;
+           margin-bottom: 12px;
+           color: #fff;
+           font-size: 15px;
+           padding-bottom: 8px;
+           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+       }
+       .map-info-window-content {
+           font-size: 13px;
+           line-height: 1.5;
+       }
+       .map-info-window-content p {
+           margin-bottom: 8px;
+           display: flex;
+           align-items: center;
+           gap: 8px;
+       }
+       .map-info-window-content p:last-child {
+           margin-bottom: 0;
+       }
+       .map-info-window-content i {
+           color: #8B5CF6;
+           width: 16px;
+           text-align: center;
+       }
+       /* Style for Leaflet's default popup tip */
+       .leaflet-popup-tip {
+           background: rgba(67, 56, 202, 0.95);
+       }
+       .leaflet-popup-content-wrapper {
+           padding: 0;
+           background: none;
+           box-shadow: none;
+       }
+       .leaflet-popup-content {
+           margin: 0;
+           line-height: inherit;
+       }
+   </style>
+</head>
+<body class="min-h-screen">
+   {% set current_page = 'index' %}
+   {% include 'components/navigation.html' %}
+
+   <!-- Main Content -->
+   <main class="ml-64 min-h-screen">
+       <div class="p-8">
+           <div class="max-w-7xl mx-auto">
+       <!-- Route Parameters Summary -->
+       <div class="card rounded-xl p-6 mb-6">
+           <h2 class="text-xl font-semibold mb-4 text-purple-400">Current Route Parameters</h2>
+           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               <div class="parameter-card">
+                   <div class="flex items-center justify-between">
+                       <span class="text-gray-400">Maximum Miles</span>
+                       <i class="fas fa-road text-purple-400"></i>
+                   </div>
+                   <p class="text-2xl font-semibold mt-2">{{ route_settings.max_miles }}</p>
+               </div>
+
+               <div class="parameter-card">
+                   <div class="flex items-center justify-between">
+                       <span class="text-gray-400">Maximum Time</span>
+                       <i class="fas fa-clock text-purple-400"></i>
+                   </div>
+                   <p class="text-2xl font-semibold mt-2">{{ route_settings.max_time }}h</p>
+               </div>
+
+               <div class="parameter-card">
+                   <div class="flex items-center justify-between">
+                       <span class="text-gray-400">Maximum Stops</span>
+                       <i class="fas fa-map-marker-alt text-purple-400"></i>
+                   </div>
+                   <p class="text-2xl font-semibold mt-2">{{ route_settings.max_stops }}</p>
+               </div>
+
+               <div class="parameter-card">
+                   <div class="flex items-center justify-between">
+                       <span class="text-gray-400">Available Drivers</span>
+                       <i class="fas fa-users text-purple-400"></i>
+                   </div>
+                   <p class="text-2xl font-semibold mt-2">{{ drivers|length }}</p>
+               </div>
+           </div>
+       </div>
+
+       <!-- Main Input Card -->
+       <div class="card rounded-xl p-6 mb-6">
+           <h2 class="text-xl font-semibold mb-6 text-purple-400">Route Planning</h2>
+
+           <!-- Input Method Tabs -->
+           <div class="flex border-b border-gray-700 mb-6">
+               <button id="manualTab" class="input-tab active">Manual Entry</button>
+               <button id="csvTab" class="input-tab">CSV Upload</button>
+               <button id="dbTab" class="input-tab">Database</button>
+           </div>
+
+           <!-- Manual Entry Section -->
+           <div id="manualEntry">
+               <!-- Depot Input -->
+               <div class="mb-6">
+                   <label class="block text-gray-300 text-sm font-medium mb-2" for="mainDepot">
+                       Depot Address
+                   </label>
+                   <div class="relative">
+                       <input class="modern-input w-full rounded-md pl-10 pr-16 py-3"
+                              id="mainDepot"
+                              type="text"
+                              value="{{ default_depot }}"
+                              placeholder="Enter depot address...">
+                       <div class="absolute left-3 top-3 text-purple-400">
+                           <i class="fas fa-warehouse"></i>
+                       </div>
+                       <button type="button"
+                               id="resetDepotBtn"
+                               class="absolute right-3 top-3 text-gray-400 hover:text-purple-400 transition-colors duration-300"
+                               title="Reset to company default">
+                           <i class="fas fa-undo"></i>
+                       </button>
+                   </div>
+                   <p class="text-xs text-gray-400 mt-1">
+                       <i class="fas fa-info-circle mr-1"></i>
+                       You can customize the depot address for this route or use your company default
+                   </p>
+               </div>
+
+               <!-- Delivery Address Input -->
+               <div class="mb-6">
+                   <label class="block text-gray-300 text-sm font-medium mb-2" for="deliveryAddress">
+                       Add Delivery Address
+                   </label>
+                   <div class="relative">
+                       <input class="modern-input w-full rounded-md pl-10 pr-4 py-3"
+                              id="deliveryAddress"
+                              type="text"
+                              placeholder="Enter delivery address...">
+                       <div class="absolute left-3 top-3 text-purple-400">
+                           <i class="fas fa-map-marker-alt"></i>
+                       </div>
+                   </div>
+                   <div id="addressSuggestions" class="mt-2"></div>
+               </div>
+
+               <!-- Address List -->
+               <div class="mb-6">
+                   <label class="block text-gray-300 text-sm font-medium mb-2">
+                       Delivery Addresses
+                   </label>
+                   <div id="addressList" class="max-h-60 overflow-y-auto mb-2">
+                       <!-- Address items will be added here -->
+                   </div>
+                   <textarea class="modern-input w-full rounded-md px-4 py-3 h-40 hidden"
+                             id="deliveryAddresses"
+                             readonly></textarea>
+               </div>
+           </div>
+
+           <!-- CSV Upload Section -->
+           <div id="csvUpload" class="hidden">
+               <div class="mb-6">
+                   <label class="block text-gray-300 text-sm font-medium mb-2">
+                       Upload CSV File
+                   </label>
+                   <div class="flex items-center justify-center w-full">
+                       <label class="flex flex-col w-full h-32 border-2 border-gray-700 border-dashed rounded-lg cursor-pointer bg-[#1A1A1A] hover:bg-[#2A2A2A] transition-all duration-300">
+                           <div class="flex flex-col items-center justify-center pt-7">
+                               <svg class="w-8 h-8 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                               </svg>
+                               <p class="pt-1 text-sm tracking-wider text-gray-400 group-hover:text-gray-600">
+                                   Upload CSV file
+                               </p>
+                           </div>
+                           <input type="file" class="opacity-0" id="csvFile" accept=".csv"/>
+                       </label>
+                   </div>
+                   <div class="mt-2 text-sm text-gray-400">
+                       <a href="#" id="downloadTemplate" class="text-purple-400 hover:text-purple-300">
+                           <i class="fas fa-download mr-1"></i>Download Template
+                       </a>
+                   </div>
+               </div>
+               <div id="csvPreview" class="hidden">
+                   <div class="bg-[#1A1A1A] rounded-lg p-4">
+                       <div class="max-h-60 overflow-y-auto">
+                           <table class="w-full" id="csvTable">
+                               <thead class="text-gray-400 text-sm">
+                                   <tr>
+                                       <th class="text-left py-2">Reference</th>
+                                       <th class="text-left py-2">Site</th>
+                                       <th class="text-left py-2">Client</th>
+                                       <th class="text-left py-2">Address</th>
+                                       <th class="text-left py-2">Actions</th>
+                                   </tr>
+                               </thead>
+                               <tbody class="text-sm"></tbody>
+                           </table>
+                       </div>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Database Section -->
+           <div id="dbSection" class="hidden">
+               <div class="flex items-center justify-center h-40">
+                   <p class="text-gray-400">
+                       Database integration coming soon...
+                   </p>
+               </div>
+           </div>
+
+           <!-- Optimize Button -->
+           <button id="optimizeButton"
+                   class="btn-purple w-full text-white font-medium py-3 px-6 rounded-md
+                          flex items-center justify-center space-x-2">
+               <i class="fas fa-route mr-2"></i>
+               <span>Optimize Routes</span>
+           </button>
+       </div>
+
+       <!-- Progress Container -->
+       <div id="progressContainer" class="hidden">
+           <div class="card rounded-xl p-6 mb-6">
+               <div class="flex flex-col items-center justify-center">
+                   <div class="loading-spinner w-12 h-12 rounded-full"></div>
+                   <div id="progressMessage" class="mt-4 text-lg font-medium text-gray-300 loading-dots">
+                       Optimizing routes
+                   </div>
+                   <div id="quirkMessage" class="mt-2 text-sm text-gray-400 italic fade-message"></div>
+               </div>
+           </div>
+       </div>
+
+       <!-- Error Alert -->
+       <div id="error" class="hidden">
+           <div class="bg-red-900/50 border-l-4 border-red-500 p-4 mb-6 rounded-r-md fade-in" role="alert">
+               <div class="flex">
+                   <div class="flex-shrink-0">
+                       <i class="fas fa-exclamation-circle text-red-400"></i>
+                   </div>
+                   <div class="ml-3">
+                       <p class="text-sm text-red-100" id="errorMessage"></p>
+                   </div>
+               </div>
+           </div>
+       </div>
+
+       <!-- Results Grid -->
+       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           <!-- Results Column -->
+           <div>
+               <!-- Optimization Results -->
+               <div id="results" class="hidden">
+                   <div class="card rounded-xl p-6 mb-6">
+                       <h2 class="text-xl font-semibold mb-4 text-purple-400">Optimization Results</h2>
+                       <div id="resultContent" class="space-y-4"></div>
+                   </div>
+               </div>
+
+               <!-- Missed Addresses -->
+               <div id="missedAddresses" class="hidden">
+                   <div class="card rounded-xl p-6">
+                       <h2 class="text-xl font-semibold mb-4 text-red-400">Missed Addresses</h2>
+                       <div id="missedAddressesContent" class="space-y-2"></div>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Map Column -->
+           <div id="mapContainer" class="hidden">
+               <div class="card rounded-xl p-6">
+                   <div class="map-container">
+                       <div id="map" class="w-full h-[600px] rounded-lg"></div>
+                       <div id="mapLegend" class="map-legend hidden">
+                           <div class="text-sm font-medium mb-2">Routes</div>
+                           <div id="legendContent"></div>
+                       </div>
+                   </div>
+               </div>
+               </div>
+           </div>
+       </div>
+   </main>
+
+   <!-- Scripts -->
+   <script src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places,geometry"></script>
+   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+   <script>
+       // Route colors and patterns
+       const routeColors = [
+           '#8B5CF6', // Purple
+           '#EC4899', // Pink
+           '#10B981', // Green
+           '#F59E0B', // Orange
+           '#EF4444', // Red
+           '#3B82F6', // Blue
+           '#14B8A6', // Teal
+           '#A855F7'  // Violet
+       ];
+
+       const routePatterns = [
+           [],           // Solid
+           [12, 6],      // Dashed
+           [16, 8, 4],   // Dash-dot
+           [8, 4],       // Short dash
+           [20, 10, 5]   // Long dash-dot
+       ];
+
+       let map = null;
+       let routeLayers = [];
+       let markers = [];
+
+       // Initialize Google Maps Autocomplete with bias towards Redditch, UK
+       function initAutocomplete() {
+           const redditchBounds = new google.maps.LatLngBounds(
+               new google.maps.LatLng(52.2694, -1.9747),
+               new google.maps.LatLng(52.3195, -1.8940)
+           );
+
+           const options = {
+               bounds: redditchBounds,
+               componentRestrictions: { country: "uk" },
+               strictBounds: false
+           };
+
+           // Initialize autocomplete for delivery address
+           const deliveryAddressInput = document.getElementById('deliveryAddress');
+           const deliveryAddressAutocomplete = new google.maps.places.Autocomplete(deliveryAddressInput, options);
+
+           deliveryAddressAutocomplete.addListener('place_changed', function() {
+               const place = deliveryAddressAutocomplete.getPlace();
+               if (place.formatted_address) {
+                   addAddressToList(place.formatted_address);
+                   deliveryAddressInput.value = '';
+               }
+           });
+
+           // Initialize autocomplete for depot address
+           const depotAddressInput = document.getElementById('mainDepot');
+           const depotAddressAutocomplete = new google.maps.places.Autocomplete(depotAddressInput, options);
+
+           depotAddressAutocomplete.addListener('place_changed', function() {
+               const place = depotAddressAutocomplete.getPlace();
+               if (place.formatted_address) {
+                   depotAddressInput.value = place.formatted_address;
+                   showSuccess('Depot address updated');
+               }
+           });
+       }
+
+       // Handle address list
+       function addAddressToList(address) {
+           const addressList = document.getElementById('addressList');
+           const deliveryAddresses = document.getElementById('deliveryAddresses');
+
+           const addressItem = document.createElement('div');
+           addressItem.className = 'address-item';
+           addressItem.innerHTML = `
+               <span>${address}</span>
+               <button class="delete-address" onclick="removeAddress(this)">
+                   <i class="fas fa-trash"></i>
+               </button>
+           `;
+
+           addressList.appendChild(addressItem);
+
+           if (deliveryAddresses.value) {
+               deliveryAddresses.value += '\n';
+           }
+           deliveryAddresses.value += address;
+       }
+
+       function removeAddress(button) {
+           const addressItem = button.parentElement;
+           const address = addressItem.querySelector('span').textContent;
+           const deliveryAddresses = document.getElementById('deliveryAddresses');
+
+           addressItem.remove();
+
+           const addresses = deliveryAddresses.value.split('\n');
+           const index = addresses.indexOf(address);
+           if (index > -1) {
+               addresses.splice(index, 1);
+               deliveryAddresses.value = addresses.join('\n');
+           }
+       }
+
+       // Tab switching
+       document.getElementById('manualTab').addEventListener('click', function() {
+           document.getElementById('manualEntry').classList.remove('hidden');
+           document.getElementById('csvUpload').classList.add('hidden');
+           document.getElementById('dbSection').classList.add('hidden');
+           this.classList.add('active');
+           document.getElementById('csvTab').classList.remove('active');
+           document.getElementById('dbTab').classList.remove('active');
+       });
+
+       document.getElementById('csvTab').addEventListener('click', function() {
+           document.getElementById('manualEntry').classList.add('hidden');
+           document.getElementById('csvUpload').classList.remove('hidden');
+           document.getElementById('dbSection').classList.add('hidden');
+           this.classList.add('active');
+           document.getElementById('manualTab').classList.remove('active');
+           document.getElementById('dbTab').classList.remove('active');
+       });
+
+       document.getElementById('dbTab').addEventListener('click', function() {
+           document.getElementById('manualEntry').classList.add('hidden');
+           document.getElementById('csvUpload').classList.add('hidden');
+           document.getElementById('dbSection').classList.remove('hidden');
+           this.classList.add('active');
+           document.getElementById('manualTab').classList.remove('active');
+           document.getElementById('csvTab').classList.remove('active');
+       });
+
+       // CSV handling
+       document.getElementById('csvFile').addEventListener('change', function(e) {
+           if (!e.target.files.length) return;
+
+           const file = e.target.files[0];
+           const reader = new FileReader();
+
+           reader.onload = function(event) {
+               try {
+                   const csvContent = event.target.result;
+                   const rows = csvContent.split('\n').map(row => 
+                       row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+                   );
+
+                   // Validate CSV structure
+                   if (rows.length < 2) {
+                       showError('CSV file must contain at least a header row and one data row');
+                       return;
+                   }
+
+                   const header = rows[0];
+                   const requiredColumns = ['Ticket Reference/WO Number', 'Site Name', 'Site Number', 'Client', 'Address Line 1', 'Address Line 2', 'Postcode', 'City', 'Created Date', 'SLA Date'];
+                   
+                   // Validate headers
+                   const missingColumns = requiredColumns.filter(col => !header.includes(col));
+                   if (missingColumns.length > 0) {
+                       showError(`Missing required columns: ${missingColumns.join(', ')}`);
+                       return;
+                   }
+
+                   // Clear existing addresses
+                   document.getElementById('deliveryAddresses').value = '';
+                   const tableBody = document.querySelector('#csvTable tbody');
+                   tableBody.innerHTML = '';
+
+                   // Process data rows
+                   const addresses = [];
+                   rows.slice(1).forEach((row, index) => {
+                       if (row.length >= requiredColumns.length) {
+                           // Extract address components
+                           const addressLine1 = row[4].trim();
+                           const city = row[7].trim();
+                           const postcode = row[6].trim();
+                           
+                           // Format the full address
+                           const address = [addressLine1, city, postcode]
+                               .filter(part => part.length > 0)
+                               .join(', ');
+                           
+                           if (address.length > 0) {
+                               addresses.push(address);
+
+                               const tr = document.createElement('tr');
+                               tr.className = 'border-t border-gray-800';
+                               tr.innerHTML = `
+                                   <td class="py-2 text-gray-300">${row[0]}</td>
+                                   <td class="py-2 text-gray-300">${row[1]}</td>
+                                   <td class="py-2 text-gray-300">${row[3]}</td>
+                                   <td class="py-2 text-gray-300">${address}</td>
+                                   <td class="py-2">
+                                       <button class="text-red-400 hover:text-red-300 transition-colors duration-200" 
+                                               onclick="removeCSVRow(this, ${index})">
+                                           <i class="fas fa-trash"></i>
+                                       </button>
+                                   </td>
+                               `;
+                               tableBody.appendChild(tr);
+                           }
+                       }
+                   });
+
+                   // Update the hidden textarea with addresses
+                   document.getElementById('deliveryAddresses').value = addresses.join('\n');
+                   document.getElementById('csvPreview').classList.remove('hidden');
+
+               } catch (error) {
+                   console.error('Error processing CSV:', error);
+                   showError('Error processing CSV file. Please check the file format.');
+               }
+           };
+
+           reader.onerror = function() {
+               showError('Error reading the CSV file');
+           };
+
+           reader.readAsText(file);
+       });
+
+       function removeCSVRow(button, index) {
+           const row = button.closest('tr');
+           const address = row.cells[3].textContent;
+           row.remove();
+
+           // Update the hidden textarea
+           const deliveryAddresses = document.getElementById('deliveryAddresses');
+           const addresses = deliveryAddresses.value.split('\n');
+           addresses.splice(index, 1);
+           deliveryAddresses.value = addresses.join('\n');
+
+           // If no more rows, hide the preview
+           const tableBody = document.querySelector('#csvTable tbody');
+           if (tableBody.children.length === 0) {
+               document.getElementById('csvPreview').classList.add('hidden');
+           }
+       }
+
+       // Template download with proper headers
+       document.getElementById('downloadTemplate').addEventListener('click', function(e) {
+           e.preventDefault();
+           const headers = [
+               'Ticket Reference/WO Number',
+               'Site Name',
+               'Site Number',
+               'Client',
+               'Address Line 1',
+               'Address Line 2',
+               'Postcode',
+               'City',
+               'Created Date',
+               'SLA Date'
+           ];
+           const template = headers.join(',') + '\n';
+           const blob = new Blob([template], { type: 'text/csv' });
+           const url = window.URL.createObjectURL(blob);
+           const a = document.createElement('a');
+           a.setAttribute('href', url);
+           a.setAttribute('download', 'route_template.csv');
+           a.click();
+           window.URL.revokeObjectURL(url);
+       });
+
+       // Initialize dark mode map
+       function initDarkMap(element) {
+           try {
+               if (map !== null) {
+                   map.remove();
+               }
+
+               routeLayers = [];
+               markers = [];
+
+               map = L.map(element, {
+                   minZoom: 3,
+                   maxZoom: 18
+               });
+
+               // Use a more legible dark theme map style
+               L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                   attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>',
+                   maxZoom: 20,
+                   minZoom: 3
+               }).addTo(map);
+
+               return map;
+           } catch (error) {
+               console.error('Error initializing map:', error);
+               showError('Error initializing map. Please check console for details.');
+               return null;
+           }
+       }
+
+       // Create route on map
+       async function createRoute(map, path, color, pattern, routeInfo) {
+           try {
+               console.log('Creating route:', { path, color, pattern });
+               let routeCoordinates = [];
+               let bounds = [];
+               
+               // Get coordinates for each address
+               for (let i = 0; i < path.length - 1; i++) {
+                   const start = path[i];
+                   const end = path[i + 1];
+                   
+                   console.log(`Getting directions from ${start} to ${end}`);
+                   
+                   // Get route between points using Google Directions API
+                   const directionsService = new google.maps.DirectionsService();
+                   
+                   try {
+                       const result = await directionsService.route({
+                           origin: start,
+                           destination: end,
+                           travelMode: google.maps.TravelMode.DRIVING
+                       });
+                       
+                       // Extract path from response
+                       const route = result.routes[0].overview_path;
+                       const decodedPath = route.map(point => [point.lat(), point.lng()]);
+                       routeCoordinates.push(...decodedPath);
+                       
+                       // Add points to bounds
+                       decodedPath.forEach(point => bounds.push(point));
+                       
+                       console.log(`Added ${decodedPath.length} points to route`);
+                   } catch (error) {
+                       console.error('Error getting directions:', error);
+                       // Fallback to straight line if directions fail
+                       const startGeo = await geocodeAddress(start);
+                       const endGeo = await geocodeAddress(end);
+                       if (startGeo && endGeo) {
+                           routeCoordinates.push([startGeo.lat, startGeo.lng]);
+                           routeCoordinates.push([endGeo.lat, endGeo.lng]);
+                           bounds.push([startGeo.lat, startGeo.lng]);
+                           bounds.push([endGeo.lat, endGeo.lng]);
+                       }
+                   }
+               }
+
+               if (routeCoordinates.length < 2) {
+                   console.error('Not enough coordinates to create route');
+                   return null;
+               }
+
+               console.log('Creating polyline with coordinates:', routeCoordinates);
+
+               // Create the route line with custom style
+               const routeLine = L.polyline(routeCoordinates, {
+                   color: color,
+                   weight: 5,
+                   opacity: 0.9,
+                   dashArray: pattern,
+                   lineCap: 'round',
+                   lineJoin: 'round',
+                   shadowColor: '#000',
+                   shadowBlur: 10,
+                   shadowOffset: [-2, 2],
+                   shadowOpacity: 0.3
+               });
+
+               routeLine.addTo(map);
+               console.log('Route line added to map');
+
+               // Add hover effects with enhanced visibility
+               routeLine.on('mouseover', () => {
+                   routeLine.setStyle({
+                       weight: 8,
+                       opacity: 1,
+                       shadowOpacity: 0.5
+                   });
+               });
+
+               routeLine.on('mouseout', () => {
+                   routeLine.setStyle({
+                       weight: 5,
+                       opacity: 0.9,
+                       shadowOpacity: 0.3
+                   });
+               });
+
+               // Add click popup with route info
+               routeLine.on('click', (e) => {
+                   L.popup()
+                       .setLatLng(e.latlng)
+                       .setContent(`
+                           <div class="map-info-window">
+                               <div class="map-info-window-header">
+                                   ${routeInfo.driver}
+                               </div>
+                               <div class="map-info-window-content">
+                                   <p><i class="fas fa-clock"></i> ${routeInfo.total_time}</p>
+                                   <p><i class="fas fa-road"></i> ${routeInfo.total_distance}</p>
+                                   <p><i class="fas fa-map-marker-alt"></i> ${routeInfo.num_stops} stops</p>
+                               </div>
+                           </div>
+                       `)
+                       .openOn(map);
+               });
+
+               routeLayers.push(routeLine);
+
+               // Fit map to bounds including this route
+               if (bounds.length > 0) {
+                   map.fitBounds(bounds, {
+                       padding: [50, 50],
+                       maxZoom: 15
+                   });
+               }
+
+               return routeLine;
+           } catch (error) {
+               console.error('Error in createRoute:', error);
+               return null;
+           }
+       }
+
+       // Helper function to geocode address
+       async function geocodeAddress(address) {
+           return new Promise((resolve, reject) => {
+               const geocoder = new google.maps.Geocoder();
+               geocoder.geocode({ address: address }, (results, status) => {
+                   if (status === 'OK' && results[0]) {
+                       resolve({
+                           lat: results[0].geometry.location.lat(),
+                           lng: results[0].geometry.location.lng()
+                       });
+                   } else {
+                       reject(new Error(`Geocoding failed for ${address}: ${status}`));
+                   }
+               });
+           });
+       }
+
+       // Create custom marker
+       function createCustomMarker(position, color, label, isDepot = false) {
+           const markerElement = document.createElement('div');
+           markerElement.className = isDepot ? 'depot-marker' : 'custom-marker';
+           markerElement.style.backgroundColor = isDepot ? '#4F46E5' : color;
+           markerElement.innerHTML = isDepot ? '<i class="fas fa-warehouse"></i>' : label;
+
+           return L.divIcon({
+               className: 'custom-div-icon',
+               html: markerElement.outerHTML,
+               iconSize: [30, 30],
+               iconAnchor: [15, 15]
+           });
+       }
+
+       // Create missed marker
+       function createMissedMarker(position, address, reason) {
+           const marker = L.marker(position, {
+               icon: L.divIcon({
+                   className: 'custom-div-icon',
+                   html: `
+                       <div class="missed-marker">
+                           <i class="fas fa-exclamation"></i>
+                       </div>
+                   `,
+                   iconSize: [32, 32],
+                   iconAnchor: [16, 16]
+               })
+           });
+
+           marker.bindPopup(`
+               <div class="map-info-window">
+                   <div class="map-info-window-header">
+                       Missed Address
+                   </div>
+                   <div class="map-info-window-content">
+                       <p><i class="fas fa-location-dot"></i> ${address}</p>
+                       <p><i class="fas fa-exclamation-circle"></i> ${reason}</p>
+                   </div>
+               </div>
+           `);
+
+           return marker;
+       }
+
+       // Show error message
+       function showError(message) {
+           const errorDiv = document.getElementById('error');
+           const errorMessage = document.getElementById('errorMessage');
+           errorMessage.textContent = message;
+           errorDiv.classList.remove('hidden');
+           errorDiv.classList.add('fade-in');
+
+           setTimeout(() => {
+               errorDiv.classList.add('hidden');
+           }, 5000);
+       }
+
+       function showSuccess(message) {
+           // Create a success message element if it doesn't exist
+           let successElement = document.getElementById('success');
+           if (!successElement) {
+               successElement = document.createElement('div');
+               successElement.id = 'success';
+               successElement.className = 'hidden';
+               successElement.innerHTML = `
+                   <div class="bg-green-900/50 border-l-4 border-green-500 p-4 mb-6 rounded-r-md fade-in" role="alert">
+                       <div class="flex">
+                           <div class="flex-shrink-0">
+                               <i class="fas fa-check-circle text-green-400"></i>
+                           </div>
+                           <div class="ml-3">
+                               <p class="text-sm text-green-100" id="successMessage"></p>
+                           </div>
+                       </div>
+                   </div>
+               `;
+               document.getElementById('error').parentNode.insertBefore(successElement, document.getElementById('error'));
+           }
+
+           document.getElementById('successMessage').textContent = message;
+           successElement.classList.remove('hidden');
+           setTimeout(() => {
+               successElement.classList.add('hidden');
+           }, 3000);
+       }
+
+       // Quirky messages for loading state
+       const quirkMessages = [
+           "Untangling the spaghetti of routes...",
+           "Teaching our pigeons to read maps...",
+           "Consulting with the GPS gnomes...",
+           "Bribing traffic lights for green waves...",
+           "Calculating shortest path through space-time continuum...",
+           "Rerouting to avoid dragon nests...",
+           "Syncing quantum entangled delivery trucks...",
+           "Negotiating with traffic cone unions...",
+           "Recalibrating flux capacitors for optimal delivery times...",
+           "Applying chaos theory to traffic patterns..."
+       ];
+
+       // Reset depot button handler
+       document.getElementById('resetDepotBtn').addEventListener('click', function() {
+           document.getElementById('mainDepot').value = "{{ default_depot }}";
+           showSuccess('Depot address reset to company default');
+       });
+
+       // Optimize button click handler
+       document.getElementById('optimizeButton').addEventListener('click', function() {
+           const mainDepot = document.getElementById('mainDepot').value;
+           const deliveryAddresses = document.getElementById('deliveryAddresses').value;
+           const activeTab = document.querySelector('.input-tab.active').textContent.trim().toLowerCase();
+
+           if (!mainDepot || !deliveryAddresses) {
+               showError('Please enter both depot and delivery addresses.');
+               return;
+           }
+
+           let data;
+           if (activeTab === 'csv upload') {
+               // For CSV upload, format the data with proper headers
+               const csvRows = [];
+               // Add header row
+               csvRows.push([
+                   'Ticket Reference/WO Number',
+                   'Site Name',
+                   'Site Number',
+                   'Client',
+                   'Address Line 1',
+                   'Address Line 2',
+                   'Postcode',
+                   'City',
+                   'Created Date',
+                   'SLA Date'
+               ].join(','));
+
+               // Add data rows
+               const tableBody = document.querySelector('#csvTable tbody');
+               tableBody.querySelectorAll('tr').forEach(row => {
+                   const cells = row.querySelectorAll('td');
+                   const address = cells[3].textContent;
+                   const addressParts = address.split(',').map(part => part.trim());
+                   
+                   // Extract address components
+                   let addressLine1 = addressParts[0] || '';
+                   let city = addressParts[1] || '';
+                   let postcode = addressParts[2] || '';
+
+                   csvRows.push([
+                       cells[0].textContent, // Reference
+                       cells[1].textContent, // Site Name
+                       '', // Site Number
+                       cells[2].textContent, // Client
+                       addressLine1,
+                       '', // Address Line 2
+                       postcode,
+                       city,
+                       '', // Created Date
+                       ''  // SLA Date
+                   ].join(','));
+               });
+               
+               data = {
+                   mainDepot,
+                   source_type: 'csv',
+                   csvData: csvRows.join('\n')
+               };
+           } else {
+               data = {
+                   mainDepot,
+                   source_type: 'manual',
+                   deliveryAddresses
+               };
+           }
+
+           // Show progress spinner and start updates
+           const progressContainer = document.getElementById('progressContainer');
+           const quirkMessage = document.getElementById('quirkMessage');
+           progressContainer.classList.remove('hidden');
+           progressContainer.classList.add('fade-in');
+
+           let messageIndex = 0;
+           const messageInterval = setInterval(() => {
+               quirkMessage.textContent = quirkMessages[messageIndex];
+               messageIndex = (messageIndex + 1) % quirkMessages.length;
+           }, 3000);
+
+           // Disable optimize button and show loading state
+           const optimizeButton = this;
+           optimizeButton.disabled = true;
+           optimizeButton.classList.add('opacity-50');
+
+           fetch('/optimize', {
+               method: 'POST',
+               headers: {
+                   'Content-Type': 'application/json',
+               },
+               body: JSON.stringify(data),
+           })
+           .then(response => response.json())
+           .then(data => {
+               // Store result for dashboard functionality
+               lastOptimizationResult = data;
+
+               // Clear intervals and reset UI
+               clearInterval(messageInterval);
+               progressContainer.classList.add('hidden');
+               optimizeButton.disabled = false;
+               optimizeButton.classList.remove('opacity-50');
+
+               // Hide error message if previously shown
+               document.getElementById('error').classList.add('hidden');
+
+               const resultsDiv = document.getElementById('results');
+               const resultContent = document.getElementById('resultContent');
+               resultContent.innerHTML = '';
+
+               if (data.results && data.results.length > 0) {
+                   // Initialize map
+                   const mapContainer = document.getElementById('mapContainer');
+                   mapContainer.classList.remove('hidden');
+                   mapContainer.style.display = 'block';
+
+                   setTimeout(() => {
+                       const mapElement = document.getElementById('map');
+                       if (!mapElement) {
+                           console.error('Map element not found');
+                           showError('Map container not found. Please refresh the page.');
+                           return;
+                       }
+                       
+                       const map = initDarkMap(mapElement);
+                       if (!map) {
+                           console.error('Failed to initialize map');
+                           showError('Failed to initialize map. Please check your internet connection and refresh the page.');
+                           return;
+                       }
+                       
+                       const bounds = [];
+                       const legendContent = document.getElementById('legendContent');
+                       legendContent.innerHTML = '';
+
+                       // Process each route
+                       data.results.forEach((result, routeIndex) => {
+                           // Add result card
+                           const resultElement = document.createElement('div');
+                           resultElement.className = 'card p-4';
+                           resultElement.innerHTML = `
+                               <div class="flex justify-between items-start mb-4">
+                                   <h3 class="font-semibold text-lg text-purple-400">${result.driver}</h3>
+                                   <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200">
+                                       ${result.num_stops} stops
+                                   </span>
+                               </div>
+                               <div class="grid grid-cols-2 gap-4 mb-4">
+                                   <div class="bg-[#1A1A1A] p-3 rounded-lg">
+                                       <p class="text-sm text-gray-400">Total Time</p>
+                                       <p class="text-lg font-medium text-white">${result.total_time}</p>
+                                   </div>
+                                   <div class="bg-[#1A1A1A] p-3 rounded-lg">
+                                       <p class="text-sm text-gray-400">Total Distance</p>
+                                       <p class="text-lg font-medium text-white">${result.total_distance}</p>
+                                   </div>
+                               </div>
+                               <div class="mb-4">
+                                   <p class="text-sm text-gray-400 mb-2">Route Stops</p>
+                                   <div class="bg-[#1A1A1A] p-3 rounded-lg">
+                                       ${result.route.map((stop, index) => `
+                                           <div class="flex items-start space-x-3 py-2">
+                                               <div class="stop-icon ${index === 0 ? 'depot' : ''}">
+                                                   ${index === 0 ? '<i class="fas fa-warehouse"></i>' : index}
+                                               </div>
+                                               <p class="text-white text-sm pt-1">${stop}</p>
+                                           </div>
+                                       `).join('')}
+                                   </div>
+                               </div>
+                               <div class="space-y-3">
+                                   <!-- Add to Dashboard Button -->
+                                   <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-3">
+                                       <div class="flex items-center justify-between">
+                                           <div>
+                                               <h4 class="text-white font-medium">Dashboard Tracking</h4>
+                                               <p class="text-blue-100 text-sm">Add this route to the delivery dashboard</p>
+                                           </div>
+                                           <button onclick="addToDashboard()"
+                                                   class="px-3 py-1 bg-blue-800 hover:bg-blue-900 rounded text-white text-sm transition-colors duration-300">
+                                               <i class="fas fa-plus mr-1"></i> Add to Dashboard
+                                           </button>
+                                       </div>
+                                   </div>
+
+                                   <!-- Note about dashboard -->
+                                   <div class="bg-gradient-to-r from-gray-600 to-gray-700 rounded-lg p-3">
+                                       <div class="text-center">
+                                           <h4 class="text-white font-medium mb-2">Route Created Successfully</h4>
+                                           <p class="text-gray-100 text-sm mb-3">Click "Add to Dashboard" to enable tracking and share with drivers</p>
+                                       </div>
+                                   </div>
+
+                                   <!-- Navigation Links -->
+                                   <div class="flex space-x-4">
+                                       <a href="${result.google_maps}" target="_blank"
+                                          class="flex-1 text-center px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600
+                                                 rounded-lg text-white transition-all duration-300 hover:shadow-lg
+                                                 hover:shadow-purple-500/20">
+                                           <i class="fab fa-google mr-2"></i> Google Maps
+                                       </a>
+                                       <a href="${result.apple_maps}" target="_blank"
+                                          class="flex-1 text-center px-4 py-2 bg-[#2A2A2A] rounded-lg text-white
+                                                 transition-all duration-300 hover:bg-[#333333]">
+                                           <i class="fab fa-apple mr-2"></i> Apple Maps
+                                       </a>
+                                   </div>
+                               </div>
+                           `;
+                           resultContent.appendChild(resultElement);
+
+                           // Add route to map
+                           const routeColor = routeColors[routeIndex % routeColors.length];
+                           const routePattern = routePatterns[routeIndex % routePatterns.length];
+
+                           // Add to legend
+                           const legendItem = document.createElement('div');
+                           legendItem.className = 'legend-item';
+                           legendItem.innerHTML = `
+                               <div class="legend-color" style="background-color: ${routeColor}"></div>
+                               <span>${result.driver}</span>
+                           `;
+                           legendContent.appendChild(legendItem);
+
+                           // Process route coordinates and add markers
+                           result.route.forEach((address, stopIndex) => {
+                               const geocoder = new google.maps.Geocoder();
+                               geocoder.geocode({ address: address }, (results, status) => {
+                                   if (status === 'OK') {
+                                       const position = [
+                                           results[0].geometry.location.lat(),
+                                           results[0].geometry.location.lng()
+                                       ];
+                                       bounds.push(position);
+
+                                       // Create marker (only create depot marker once)
+                                       const isDepot = stopIndex === 0 || stopIndex === result.route.length - 1;
+                                       if (isDepot && stopIndex === result.route.length - 1) {
+                                           // Don't create a new marker for the final depot stop
+                                           return;
+                                       }
+
+                                       const marker = L.marker(position, {
+                                           icon: createCustomMarker(
+                                               position,
+                                               routeColor,
+                                               isDepot ? '' : stopIndex.toString(),
+                                               isDepot
+                                           )
+                                       }).addTo(map);
+
+                                       // Store marker reference
+                                       markers.push(marker);
+
+                                       // Add popup
+                                       marker.bindPopup(`
+                                           <div class="map-info-window">
+                                               <div class="map-info-window-header">
+                                                   ${isDepot ? 'Depot Location' : `Stop ${stopIndex}`}
+                                               </div>
+                                               <div class="map-info-window-content">
+                                                   <p><i class="fas fa-location-dot"></i> ${address}</p>
+                                                   ${!isDepot ? `<p><i class="fas fa-user"></i> ${result.driver}</p>` : ''}
+                                               </div>
+                                           </div>
+                                       `);
+
+                                       // If this is the last marker added, fit the map bounds
+                                       if (bounds.length === result.route.length - 1) { // -1 because we skip the final depot marker
+                                           map.fitBounds(bounds);
+                                       }
+                                   }
+                               });
+                           });
+
+                           // Create route with road-following path
+                           createRoute(map, result.route, routeColor, routePattern, result)
+                               .catch(error => {
+                                   console.error('Error creating route:', error);
+                               });
+                       });
+
+                       // Show map legend
+                       document.getElementById('mapLegend').classList.remove('hidden');
+                   }, 100);
+
+                   // Show results
+                   resultsDiv.classList.remove('hidden');
+                   resultsDiv.classList.add('fade-in');
+
+                   // Handle missed addresses
+                   const missedAddressesDiv = document.getElementById('missedAddresses');
+                   const missedAddressesContent = document.getElementById('missedAddressesContent');
+                   missedAddressesContent.innerHTML = '';
+
+                   if (data.missed_addresses && data.missed_addresses.length > 0) {
+                       data.missed_addresses.forEach(([address, reason]) => {
+                           // Add to missed addresses list
+                           const missedAddressElement = document.createElement('div');
+                           missedAddressElement.className = 'bg-[#1A1A1A] p-4 rounded-lg fade-in';
+                           missedAddressElement.innerHTML = `
+                               <div class="flex items-start space-x-3">
+                                   <div class="text-red-400">
+                                       <i class="fas fa-exclamation-circle mt-1"></i>
+                                   </div>
+                                   <div>
+                                       <p class="font-medium text-white">${address}</p>
+                                       <p class="text-sm text-gray-400 mt-1">${reason}</p>
+                                   </div>
+                               </div>
+                           `;
+                           missedAddressesContent.appendChild(missedAddressElement);
+
+                           // Add marker for missed address
+                           if (map) {
+                               const geocoder = new google.maps.Geocoder();
+                               geocoder.geocode({ address: address }, (results, status) => {
+                                   if (status === 'OK' && map) {
+                                       try {
+                                           const position = [
+                                               results[0].geometry.location.lat(),
+                                               results[0].geometry.location.lng()
+                                           ];
+
+                                                                                       const marker = L.marker(position, {
+                                                icon: L.divIcon({
+                                                    className: 'custom-div-icon',
+                                                    html: '<div class="missed-marker"><i class="fas fa-exclamation"></i></div>',
+                                                    iconSize: [32, 32],
+                                                    iconAnchor: [16, 16]
+                                                })
+                                            }).addTo(map);
+
+                                           markers.push(marker);
+
+                                           marker.bindPopup(`
+                                               <div class="map-info-window">
+                                                   <div class="map-info-window-header">
+                                                       Missed Address
+                                                   </div>
+                                                   <div class="map-info-window-content">
+                                                       <p><i class="fas fa-location-dot"></i> ${address}</p>
+                                                       <p><i class="fas fa-exclamation-circle"></i> ${reason}</p>
+                                                   </div>
+                                               </div>
+                                           `);
+                                       } catch (error) {
+                                           console.error('Error creating missed address marker:', error);
+                                       }
+                                   } else {
+                                       console.warn(`Failed to geocode missed address: ${address} - Status: ${status}`);
+                                   }
+                               });
+                           }
+                       });
+
+                       missedAddressesDiv.classList.remove('hidden');
+                       missedAddressesDiv.classList.add('fade-in');
+                   } else {
+                       missedAddressesDiv.classList.add('hidden');
+                   }
+               } else {
+                   showError('No valid routes found.');
+               }
+           })
+           .catch(error => {
+               console.error('Error:', error);
+               clearInterval(messageInterval);
+               progressContainer.classList.add('hidden');
+               optimizeButton.disabled = false;
+               optimizeButton.classList.remove('opacity-50');
+               showError('An error occurred while optimizing routes. Please try again.');
+               document.getElementById('results').classList.add('hidden');
+               document.getElementById('mapContainer').classList.add('hidden');
+           });
+       });
+
+       // Copy tracking URL to clipboard
+       function copyTrackingUrl(url) {
+           navigator.clipboard.writeText(url).then(function() {
+               // Show success message
+               const button = event.target.closest('button');
+               const originalText = button.innerHTML;
+               button.innerHTML = '<i class="fas fa-check mr-1"></i> Copied!';
+               button.classList.add('bg-green-900');
+
+               setTimeout(() => {
+                   button.innerHTML = originalText;
+                   button.classList.remove('bg-green-900');
+               }, 2000);
+           }).catch(function(err) {
+               console.error('Failed to copy URL: ', err);
+               alert('Failed to copy URL. Please copy manually: ' + url);
+           });
+       }
+
+       // Add route to dashboard
+       function addToDashboard() {
+           if (!lastOptimizationResult) {
+               alert('No route data available. Please run an optimization first.');
+               return;
+           }
+
+           const button = event.target.closest('button');
+           const originalText = button.innerHTML;
+           button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Adding...';
+           button.disabled = true;
+
+           fetch('/add_to_dashboard', {
+               method: 'POST',
+               headers: {
+                   'Content-Type': 'application/json',
+               },
+               body: JSON.stringify({
+                   route_data: lastOptimizationResult
+               })
+           })
+           .then(response => response.json())
+           .then(data => {
+               if (data.success) {
+                   button.innerHTML = '<i class="fas fa-check mr-1"></i> Added!';
+                   button.classList.remove('bg-blue-800', 'hover:bg-blue-900');
+                   button.classList.add('bg-green-800');
+
+                   // Show success message
+                   showSuccess('Route added to dashboard successfully!');
+
+                   setTimeout(() => {
+                       button.innerHTML = originalText;
+                       button.classList.remove('bg-green-800');
+                       button.classList.add('bg-blue-800', 'hover:bg-blue-900');
+                       button.disabled = false;
+                   }, 3000);
+               } else {
+                   throw new Error(data.error || 'Failed to add route to dashboard');
+               }
+           })
+           .catch(error => {
+               console.error('Error adding to dashboard:', error);
+               alert('Failed to add route to dashboard: ' + error.message);
+               button.innerHTML = originalText;
+               button.disabled = false;
+           });
+       }
+
+       // Store last optimization result for dashboard
+       let lastOptimizationResult = null;
+
+       // Show success message
+       function showSuccess(message) {
+           const successDiv = document.createElement('div');
+           successDiv.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-3 rounded-md shadow-lg z-50 max-w-sm';
+           successDiv.innerHTML = `
+               <div class="flex items-center">
+                   <i class="fas fa-check-circle mr-2"></i>
+                   <div>
+                       <div class="font-medium">${message}</div>
+                   </div>
+                   <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                       <i class="fas fa-times"></i>
+                   </button>
+               </div>
+           `;
+
+           document.body.appendChild(successDiv);
+
+           // Auto-remove after 5 seconds
+           setTimeout(() => {
+               if (successDiv.parentNode) {
+                   successDiv.remove();
+               }
+           }, 5000);
+       }
+
+       // Initialize map and autocomplete when page loads
+       document.addEventListener('DOMContentLoaded', function() {
+           initAutocomplete();
+       });
+   </script>
+   <script>
+       {% include 'components/mobile_navigation.js' %}
+   </script>
+</body>
+</html>

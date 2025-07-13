@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Management - EightNode AutoScheduler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1A1A1A;
+            --bg-secondary: #2A2A2A;
+            --bg-tertiary: #333333;
+            --accent-purple: #8B5CF6;
+            --accent-purple-dark: #7C3AED;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modern-input {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .modern-input:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-purple {
+            background: linear-gradient(45deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .driver-card {
+            background: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        .driver-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Enhanced Company Selector Styles */
+        .company-selector {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .company-selector::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+        }
+
+        .company-selector-title {
+            background: linear-gradient(135deg, #8B5CF6, #EC4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .company-dropdown {
+            background: var(--bg-tertiary);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 1rem 1.25rem;
+            width: 100%;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .company-dropdown:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown:hover {
+            border-color: rgba(139, 92, 246, 0.5);
+            background: var(--bg-secondary);
+        }
+
+        .company-dropdown option {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem;
+        }
+
+        /* Enhanced Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 64px;
+            height: 36px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #374151, #4B5563);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 36px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 28px;
+            width: 28px;
+            left: 4px;
+            bottom: 4px;
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider:hover {
+            background: linear-gradient(135deg, #4B5563, #6B7280);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-purple-dark));
+            border-color: rgba(139, 92, 246, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 4px rgba(139, 92, 246, 0.1);
+        }
+
+        input:checked + .slider:hover {
+            background: linear-gradient(135deg, var(--accent-purple-dark), #6D28D9);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(28px);
+            background: linear-gradient(135deg, #ffffff, #f1f5f9);
+        }
+
+        /* Disabled state */
+        input:disabled + .slider {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: linear-gradient(135deg, #1F2937, #374151);
+        }
+
+        input:disabled + .slider:hover {
+            background: linear-gradient(135deg, #1F2937, #374151);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        input:disabled + .slider:before {
+            background: linear-gradient(135deg, #9CA3AF, #D1D5DB);
+        }
+
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body class="min-h-screen">
+    {% set current_page = 'driver_management' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-white">Driver Management</h1>
+                    {% if not is_global_admin %}
+                        <p class="text-gray-400 mt-1">{{ company_name }}</p>
+                    {% endif %}
+                </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-purple-900/50 border-l-4 border-purple-500 p-4 mb-6 rounded-r-md fade-in">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-purple-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-purple-100">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if is_global_admin %}
+        <!-- Company Selection for Global Admin -->
+        <div class="company-selector mb-6">
+            <h2 class="company-selector-title">
+                <i class="fas fa-building"></i>
+                Company Selection
+            </h2>
+            <form action="{{ url_for('driver_management') }}" method="GET">
+                <select name="company"
+                        class="company-dropdown"
+                        onchange="this.form.submit()">
+                    <option value="">🏢 Select a Company</option>
+                    {% for company in companies %}
+                        <option value="{{ company }}"
+                                {% if company_name == company %}selected{% endif %}>
+                            {{ company }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if (is_global_admin and company_name) or not is_global_admin %}
+        <!-- Add New Driver Card -->
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Add New Driver</h2>
+                {% if company_name %}
+                    <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200">
+                        {{ company_name }}
+                    </span>
+                {% endif %}
+            </div>
+            <form action="{{ url_for('add_driver') }}" method="POST">
+                {% if is_global_admin %}
+                    <input type="hidden" name="company" value="{{ company_name }}">
+                {% endif %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="name">
+                            Driver Name
+                        </label>
+                        <input type="text" id="name" name="name" required
+                               class="modern-input w-full rounded-md px-4 py-3"
+                               placeholder="Enter driver name">
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2" for="phone">
+                            Phone Number
+                        </label>
+                        <input type="tel" id="phone" name="phone" required
+                               class="modern-input w-full rounded-md px-4 py-3"
+                               placeholder="Enter phone number">
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-gray-300 text-sm font-medium mb-2" for="notes">
+                        Notes
+                    </label>
+                    <textarea id="notes" name="notes"
+                              class="modern-input w-full rounded-md px-4 py-3 h-32"
+                              placeholder="Enter any additional notes"></textarea>
+                </div>
+
+
+
+                <div class="flex items-center mb-6">
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="available_for_schedule" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span class="ml-3 text-sm font-medium text-gray-300">Available for Scheduling</span>
+                </div>
+
+                <button type="submit"
+                        class="btn-purple w-full text-white font-medium py-3 px-6 rounded-md
+                               flex items-center justify-center space-x-2">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add Driver
+                </button>
+            </form>
+        </div>
+
+        <!-- Existing Drivers Card -->
+        <div class="card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Existing Drivers</h2>
+                <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200">
+                    {{ drivers|length }} Drivers
+                </span>
+            </div>
+            <div class="space-y-4">
+                {% if drivers %}
+                    {% for driver in drivers %}
+                    <div class="driver-card rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-grow">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="font-semibold text-lg text-white">{{ driver.name }}</h3>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox"
+                                               {% if driver.available_for_schedule %}checked{% endif %}
+                                               onchange="toggleDriverAvailability({{ loop.index0 }}, '{{ company_name }}')">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+
+                                <!-- Phone Number (Editable) -->
+                                <div class="mb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="fas fa-phone text-gray-400"></i>
+                                        <input type="text"
+                                               id="phone_{{ loop.index0 }}"
+                                               value="{{ driver.phone }}"
+                                               class="modern-input flex-grow rounded-md px-3 py-1 text-sm"
+                                               onblur="updateDriverPhone({{ loop.index0 }}, '{{ company_name }}', this.value)"
+                                               placeholder="Enter phone number">
+                                        <button onclick="focusPhone({{ loop.index0 }})"
+                                                class="text-purple-400 hover:text-purple-300 transition-colors duration-300"
+                                                title="Edit phone number">
+                                            <i class="fas fa-edit text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+
+                                {% if driver.notes %}
+                                <p class="text-gray-400 mt-2">
+                                    <i class="fas fa-sticky-note mr-2"></i>
+                                    {{ driver.notes }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            <form action="{{ url_for('remove_driver', index=loop.index0) }}"
+                                  method="POST"
+                                  class="ml-4"
+                                  onsubmit="return confirm('Are you sure you want to remove this driver?');">
+                                {% if is_global_admin %}
+                                    <input type="hidden" name="company" value="{{ company_name }}">
+                                {% endif %}
+                                <button type="submit"
+                                        class="text-red-400 hover:text-red-300 transition-colors duration-300">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-users text-4xl mb-4"></i>
+                        <p>No drivers added yet</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDriverAvailability(driverIndex, companyName) {
+            fetch('/toggle_driver_availability/' + driverIndex, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    company: companyName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update driver availability');
+            });
+        }
+
+        function updateDriverPhone(driverIndex, companyName, newPhone) {
+            if (!newPhone.trim()) {
+                alert('Phone number cannot be empty');
+                location.reload();
+                return;
+            }
+
+            fetch('/update_driver_phone/' + driverIndex, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    company: companyName,
+                    phone: newPhone.trim()
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    location.reload();
+                } else {
+                    showSuccess('Phone number updated successfully');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update phone number');
+                location.reload();
+            });
+        }
+
+
+
+        function focusPhone(driverIndex) {
+            const phoneInput = document.getElementById('phone_' + driverIndex);
+            phoneInput.focus();
+            phoneInput.select();
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-md shadow-lg z-50';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+
+            setTimeout(() => {
+                document.body.removeChild(successDiv);
+            }, 3000);
+        }
+
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>

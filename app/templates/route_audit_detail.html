@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Details - EightNode AutoScheduler</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1A1A1A;
+            --bg-secondary: #2A2A2A;
+            --bg-tertiary: #333333;
+            --accent-purple: #8B5CF6;
+            --accent-purple-dark: #7C3AED;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .modern-input {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple {
+            background: linear-gradient(45deg, var(--accent-purple), var(--accent-purple-dark));
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .route-card {
+            background: var(--bg-tertiary);
+            transition: all 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .driver-route {
+            border-left: 4px solid var(--accent-purple);
+            background: var(--bg-tertiary);
+            margin-bottom: 1rem;
+        }
+
+        .stop-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .stop-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .stop-number {
+            background: var(--accent-purple);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .map-container {
+            height: 400px;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        {% include 'components/mobile_navigation.css' %}
+    </style>
+</head>
+<body class="min-h-screen">
+    {% set current_page = 'route_audit' %}
+    {% include 'components/navigation.html' %}
+
+    <!-- Main Content -->
+    <div class="ml-64 min-h-screen">
+        <div class="p-8">
+            <div class="max-w-7xl mx-auto">
+                <!-- Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-white">Route Details</h1>
+                        <p class="text-gray-400 mt-1">{{ company_name }} - Route #{{ route_entry.id[:8] }}</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <!-- Download Button -->
+                        <div class="relative">
+                            <button id="downloadDetailBtn"
+                                    class="px-4 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white transition-all duration-300 flex items-center space-x-2">
+                                <i class="fas fa-download"></i>
+                                <span>Download</span>
+                                <i class="fas fa-chevron-down ml-1"></i>
+                            </button>
+
+                            <!-- Download Dropdown -->
+                            <div id="downloadDetailDropdown"
+                                 class="hidden absolute right-0 mt-2 w-48 bg-[#2A2A2A] border border-gray-600 rounded-lg shadow-lg z-10">
+                                <div class="py-2">
+                                    <a href="#" onclick="downloadRouteAsCSV()"
+                                       class="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-[#333333] hover:text-white transition-colors duration-200">
+                                        <i class="fas fa-file-csv mr-3 text-green-400"></i>
+                                        Download as CSV
+                                    </a>
+                                    <a href="#" onclick="downloadRouteAsJSON()"
+                                       class="flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-[#333333] hover:text-white transition-colors duration-200">
+                                        <i class="fas fa-file-code mr-3 text-blue-400"></i>
+                                        Download as JSON
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <a href="{{ url_for('route_audit', company=company_name if is_global_admin else '') }}"
+                           class="px-4 py-2 rounded-md bg-[#2A2A2A] text-white hover:bg-[#333333] transition-all duration-300">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back to Audit
+                        </a>
+                    </div>
+                </div>
+
+        <!-- Route Summary -->
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Route Summary</h2>
+                <span class="status-badge status-completed">
+                    <i class="fas fa-check-circle mr-1"></i>Completed
+                </span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <p class="text-gray-400 text-sm">Date & Time</p>
+                    <p class="text-white font-semibold">
+                        {{ route_entry.timestamp[:19].replace('T', ' ') }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-sm">Drivers Used</p>
+                    <p class="text-white font-semibold">
+                        {{ route_entry.data.num_drivers_used or 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-sm">Addresses Served</p>
+                    <p class="text-white font-semibold">
+                        {{ route_entry.data.total_addresses_served or 'N/A' }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-sm">Total Deliveries</p>
+                    <p class="text-white font-semibold">
+                        {{ route_entry.data.delivery_counts.total_served if route_entry.data.delivery_counts else 'N/A' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Driver Routes -->
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Driver Routes</h2>
+                <span class="bg-purple-900/50 px-3 py-1 rounded-full text-sm text-purple-200">
+                    {{ route_entry.data.results|length }} Routes
+                </span>
+            </div>
+            
+            <div class="space-y-6">
+                {% for result in route_entry.data.results %}
+                <div class="driver-route rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white">{{ result.driver }}</h3>
+                            <div class="flex space-x-4 text-sm text-gray-400 mt-1">
+                                <span><i class="fas fa-route mr-1"></i>{{ result.total_distance }}</span>
+                                <span><i class="fas fa-clock mr-1"></i>{{ result.total_time }}</span>
+                                <span><i class="fas fa-map-marker-alt mr-1"></i>{{ result.route|length - 2 }} stops</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            {% if result.google_maps_url %}
+                            <a href="{{ result.google_maps_url }}" target="_blank"
+                               class="text-purple-400 hover:text-purple-300 transition-colors duration-300"
+                               title="Open in Google Maps">
+                                <i class="fab fa-google"></i>
+                            </a>
+                            {% endif %}
+                            {% if result.apple_maps_url %}
+                            <a href="{{ result.apple_maps_url }}" target="_blank"
+                               class="text-purple-400 hover:text-purple-300 transition-colors duration-300"
+                               title="Open in Apple Maps">
+                                <i class="fab fa-apple"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        {% for address in result.route %}
+                        <div class="stop-item flex items-center">
+                            <div class="stop-number mr-3">
+                                {{ loop.index }}
+                            </div>
+                            <div class="flex-grow">
+                                <p class="text-white">{{ address }}</p>
+                                {% if loop.first %}
+                                    <p class="text-xs text-green-400">Depot (Start)</p>
+                                {% elif loop.last %}
+                                    <p class="text-xs text-green-400">Depot (End)</p>
+                                {% else %}
+                                    <p class="text-xs text-gray-400">Delivery Stop</p>
+                                {% endif %}
+                            </div>
+                            {% if not loop.first and not loop.last %}
+                            <div class="text-purple-400">
+                                <i class="fas fa-box"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Map Display -->
+        {% if route_entry.data.map_html %}
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Route Map</h2>
+            </div>
+            <div class="map-container">
+                {{ route_entry.data.map_html|safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Missed Addresses -->
+        {% if route_entry.data.missed_addresses %}
+        <div class="card rounded-xl p-6 mb-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-red-400">Missed Addresses</h2>
+                <span class="bg-red-900/50 px-3 py-1 rounded-full text-sm text-red-200">
+                    {{ route_entry.data.missed_addresses|length }} Addresses
+                </span>
+            </div>
+            
+            <div class="space-y-3">
+                {% for missed in route_entry.data.missed_addresses %}
+                <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-red-400 mt-1"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-white font-medium">{{ missed[0] }}</p>
+                            <p class="text-red-300 text-sm mt-1">{{ missed[1] }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Delivery Statistics -->
+        {% if route_entry.data.delivery_counts %}
+        <div class="card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-purple-400">Delivery Statistics</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-white">{{ route_entry.data.delivery_counts.total_required }}</p>
+                    <p class="text-gray-400 text-sm">Total Required</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-400">{{ route_entry.data.delivery_counts.total_served }}</p>
+                    <p class="text-gray-400 text-sm">Total Served</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-purple-400">
+                        {{ "%.1f"|format((route_entry.data.delivery_counts.total_served / route_entry.data.delivery_counts.total_required * 100) if route_entry.data.delivery_counts.total_required > 0 else 0) }}%
+                    </p>
+                    <p class="text-gray-400 text-sm">Success Rate</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Route data for download
+        const routeData = {{ route_entry | tojson }};
+
+        // Download dropdown functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadBtn = document.getElementById('downloadDetailBtn');
+            const downloadDropdown = document.getElementById('downloadDetailDropdown');
+
+            if (downloadBtn && downloadDropdown) {
+                downloadBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    downloadDropdown.classList.toggle('hidden');
+                });
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
+                    if (!downloadBtn.contains(e.target) && !downloadDropdown.contains(e.target)) {
+                        downloadDropdown.classList.add('hidden');
+                    }
+                });
+            }
+
+        });
+
+        // Download functions
+        function downloadRouteAsCSV() {
+            const csvContent = generateCSV(routeData);
+            downloadFile(csvContent, `route_${routeData.id.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+            document.getElementById('downloadDetailDropdown').classList.add('hidden');
+        }
+
+        function downloadRouteAsJSON() {
+            const jsonContent = JSON.stringify(routeData, null, 2);
+            downloadFile(jsonContent, `route_${routeData.id.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+            document.getElementById('downloadDetailDropdown').classList.add('hidden');
+        }
+
+        function generateCSV(route) {
+            let csv = 'Route ID,Date,Time,Company,Driver,Total Distance,Total Time,Number of Stops,Route Stops\n';
+
+            const timestamp = new Date(route.timestamp);
+            const date = timestamp.toISOString().split('T')[0];
+            const time = timestamp.toTimeString().split(' ')[0];
+
+            route.data.results.forEach(result => {
+                const routeStops = result.route.join(' → ');
+                csv += `"${route.id.substring(0, 8)}","${date}","${time}","${route.company}","${result.driver}","${result.total_distance}","${result.total_time}","${result.num_stops}","${routeStops}"\n`;
+            });
+
+            return csv;
+        }
+
+        function downloadFile(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+    <script>
+        {% include 'components/mobile_navigation.js' %}
+    </script>
+</body>
+</html>
